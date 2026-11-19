@@ -20,8 +20,8 @@ MODEL_PATH = OUTPUT_DIR / "best_model.joblib"
 METRICS_PATH = OUTPUT_DIR / "metrics.csv"
 
 st.set_page_config(
-    page_title="Intelligent Spam & Threat Detection System",
-    page_icon="🕵️",
+    page_title="Intelligent Spam Detector",
+    page_icon="project_logo.png",
     layout="wide",
     initial_sidebar_state="expanded",
 )
