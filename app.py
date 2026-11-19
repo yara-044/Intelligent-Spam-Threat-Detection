@@ -222,14 +222,38 @@ if page == "Message Scanner":
         elif sample == "Suspicious prize message (SPAM)":
             sample_text = "CONGRATULATIONS! You have won a FREE prize. Click here now to claim your reward. Send your details immediately."
         message = st.text_area("MESSAGE CONTENT", value=sample_text, height=230, placeholder="Paste message text here...")
-        if st.button("⚡ ANALYZE MESSAGE", type="primary", use_container_width=True):
+         if st.button("⚡ ANALYZE MESSAGE", type="primary", use_container_width=True):
             if not message.strip():
                 st.warning("Please enter a message first.")
             else:
-                # Same prediction behavior as predict_message.py: model.predict([message]).
-                prediction = int(model.predict([message])[0])
-                label = "spam" if prediction == 1 else "ham"
-                st.session_state["scan_result"] = {"message": message, "label": label}
+                try:
+                    # Predict using the original trained model
+                    prediction = int(model.predict([message])[0])
+                    label = "spam" if prediction == 1 else "ham"
+
+                    # Display the analysis result
+                    st.session_state["scan_result"] = {
+                        "message": message,
+                        "label": label
+                    }
+
+                    # Save scan to Supabase history
+                    user_response = st.session_state.supabase_client.auth.get_user()
+                    current_user = user_response.user
+
+                    if current_user:
+                        st.session_state.supabase_client.table("scan_history").insert({
+                            "user_id": current_user.id,
+                            "message": message,
+                            "prediction": label
+                        }).execute()
+
+                        st.success("Analysis completed and saved to your history.")
+                    else:
+                        st.warning("Analysis completed, but the scan could not be saved.")
+
+                except Exception as e:
+                    st.error(f"Analysis or history saving failed: {e}")
     with right:
         st.markdown("### 📡 Engine Status")
         st.markdown(f"<div class='panel'>🟢 <b>Model loaded</b><br><span class='muted'>Saved model bundle is active</span><hr><span class='muted'>Selected classifier</span><br><b>{best_name}</b><br><br><span class='muted'>Dataset records after duplicate removal</span><br><b>{len(dataset):,}</b><br><br><span class='muted'>Feature extraction</span><br><b>TF-IDF · 1–2 grams</b></div>", unsafe_allow_html=True)
