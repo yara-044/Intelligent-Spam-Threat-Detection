@@ -303,21 +303,21 @@ elif page == "Scan History":
                     label = item["prediction"].upper()
                     icon = "⚠️" if label == "SPAM" else "✅"
 
-with st.expander(
-    f"{icon} {label} — {item['created_at']}"
-):
-    st.write("**Analyzed message:**")
-    st.code(item["message"], language=None)
+                with st.expander(
+                   f"{icon} {label} — {item['created_at']}"
+                ):
+                   st.write("**Analyzed message:**")
+                   st.code(item["message"], language=None)
 
-    if st.button("🗑️ Delete This Record", key=f"delete_{item['id']}"):
-        st.session_state.supabase_client.table("scan_history") \
-            .delete() \
-            .eq("id", item["id"]) \
-            .eq("user_id", current_user.id) \
-            .execute()
+                if st.button("🗑️ Delete This Record", key=f"delete_{item['id']}"):
+                   st.session_state.supabase_client.table("scan_history") \
+                   .delete() \
+                   .eq("id", item["id"]) \
+                   .eq("user_id", current_user.id) \
+                   .execute()
 
-        st.success("Record deleted successfully.")
-        st.rerun()
+                   st.success("Record deleted successfully.")
+                   st.rerun()
             else:
                 st.info("You haven't analyzed any messages yet.")
 
