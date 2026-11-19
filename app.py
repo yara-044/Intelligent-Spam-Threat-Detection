@@ -160,7 +160,7 @@ if st.button("Logout", use_container_width=True):
     st.session_state.supabase_client.auth.sign_out()
     st.session_state.authenticated = False
     st.rerun()
-st.markdown("---")
+    st.markdown("---")
     st.image(str(ROOT / "project_logo.png"), use_container_width=True)
     st.markdown("<div class='sidebar-brand'>INTELLIGENT SECURITY CONSOLE</div>", unsafe_allow_html=True)
     st.caption("SPAM & THREAT ANALYSIS")
