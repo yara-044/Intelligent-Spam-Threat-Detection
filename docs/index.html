@@ -41,7 +41,16 @@
       cursor: pointer;
     }
   </style>
-</head>
+</head>               
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js")
+        .then(() => console.log("App ready"))
+        .catch(error => console.error("Service Worker error:", error));
+    });
+  }
+</script>
 <body>
   <main class="container">
     <img src="../project_logo.png" alt="Project logo">
