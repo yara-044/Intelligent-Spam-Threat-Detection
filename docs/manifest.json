@@ -1,0 +1,19 @@
+{
+  "name": "Intelligent Spam Detector",
+  "short_name": "Spam Detector",
+  "description": "Intelligent Spam and Threat Detection System",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B0B0B",
+  "theme_color": "#F5C400",
+  "icons": [
+    {
+      "src": "../project_logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
