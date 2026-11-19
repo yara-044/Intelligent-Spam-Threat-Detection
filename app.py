@@ -222,7 +222,7 @@ if page == "Message Scanner":
         elif sample == "Suspicious prize message (SPAM)":
             sample_text = "CONGRATULATIONS! You have won a FREE prize. Click here now to claim your reward. Send your details immediately."
         message = st.text_area("MESSAGE CONTENT", value=sample_text, height=230, placeholder="Paste message text here...")
-         if st.button("⚡ ANALYZE MESSAGE", type="primary", use_container_width=True):
+          if st.button("⚡ ANALYZE MESSAGE", type="primary", use_container_width=True):
             if not message.strip():
                 st.warning("Please enter a message first.")
             else:
