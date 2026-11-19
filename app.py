@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from supabase import create_client
 import subprocess
 import sys
 from pathlib import Path
