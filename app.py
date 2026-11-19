@@ -62,8 +62,8 @@ if not st.session_state.authenticated:
                     st.rerun()
                 else:
                     st.error("Please verify your email, then try logging in.")
-            except Exception:
-                st.error("Login failed. Check your email and password.")
+            except Exception as e:
+                st.error(f"Login failed: {e}")
 
     with signup_tab:
         new_email = st.text_input("Email", key="signup_email")
