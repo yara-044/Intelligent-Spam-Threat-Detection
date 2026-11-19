@@ -378,7 +378,7 @@ else:
     """, unsafe_allow_html=True)
     st.warning("The dataset contains only HAM and SPAM labels. This application classifies those two classes; it does not independently verify malware, URLs, sender identity, or determine a specific threat subtype.")
     st.markdown("**Project team**")
-    st.write("Adnan Al Jarrah · Rashed AbuSara · Yara Alamoush")
+    st.write("Yara Alamoush · Adnan Al Jarrah · Rashed AbuSara")
     st.write("Supervisor: Ahmad Irjoob")
     st.write("Faculty of Artificial Intelligence — Al-Balqa Applied University")
 
