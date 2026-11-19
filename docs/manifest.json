@@ -10,7 +10,7 @@
   "theme_color": "#F5C400",
   "icons": [
     {
-      "src": "../project_logo.png",
+      "src": "project_logo.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
