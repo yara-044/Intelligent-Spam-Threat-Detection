@@ -169,9 +169,15 @@ with st.sidebar:
     st.markdown("---")
 
     page = st.radio(
-        "NAVIGATION",
-        ["Message Scanner", "Model Dashboard", "Dataset Explorer", "About Project"]
-    )
+    "NAVIGATION",
+    [
+        "Message Scanner",
+        "Scan History",
+        "Model Dashboard",
+        "Dataset Explorer",
+        "About Project"
+    ]
+)
 st.markdown("""
 <div class="hero">
   <div class="eyebrow">Intelligent message security</div>
