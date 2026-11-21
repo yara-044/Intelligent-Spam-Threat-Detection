@@ -116,6 +116,7 @@ try:
                 }
 
                 st.session_state["custom_best_model"] = saved_bundle["name"]
+                st.session_state["custom_model_details"] = saved_bundle
                 st.session_state["custom_model_loaded_user"] = current_user.id
 
             except Exception:
