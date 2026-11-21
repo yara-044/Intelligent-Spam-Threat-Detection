@@ -221,12 +221,57 @@ if page == "Message Scanner":
     with left:
         st.markdown("### 🔍 Message Scanner")
         st.markdown("<div class='muted'>Paste an email, SMS, or message. The saved best model from your original training script will classify it.</div>", unsafe_allow_html=True)
-        sample = st.selectbox("Quick examples", ["Choose an example...", "Normal business email (HAM)", "Suspicious prize message (SPAM)"])
+        
+        if "quick_examples" not in st.session_state:
+            ham_examples = dataset[
+                dataset["label"].astype(str).str.lower() == "ham"
+            ]
+            spam_examples = dataset[
+                dataset["label"].astype(str).str.lower() == "spam"
+            ]
+
+            parts = []
+
+            if not ham_examples.empty:
+                parts.append(
+                    ham_examples.sample(n=min(5, len(ham_examples)))
+                )
+
+            if not spam_examples.empty:
+                parts.append(
+                    spam_examples.sample(n=min(5, len(spam_examples)))
+                )
+
+            if parts:
+                examples = pd.concat(parts).sample(frac=1).reset_index(drop=True)
+
+                st.session_state["quick_examples"] = [
+                    {
+                        "display": f"{row['label'].upper()} #{i+1} — {str(row['text'])[:75]}",
+                        "text": str(row["text"])
+                    }
+                    for i, row in examples.iterrows()
+                ]
+            else:
+                st.session_state["quick_examples"] = []
+
+        quick_examples = st.session_state["quick_examples"]
+
+        sample_options = ["Choose an example..."] + [
+            item["display"] for item in quick_examples
+        ]
+
+        sample = st.selectbox("Quick examples", sample_options)
+
         sample_text = ""
-        if sample == "Normal business email (HAM)":
-            sample_text = "Subject: Meeting schedule\nHello team, please find the updated meeting agenda attached. Let me know if you have any questions. Best regards."
-        elif sample == "Suspicious prize message (SPAM)":
-            sample_text = "CONGRATULATIONS! You have won a FREE prize. Click here now to claim your reward. Send your details immediately."
+
+        if sample != "Choose an example...":
+            selected = next(
+                item for item in quick_examples
+                if item["display"] == sample
+            )
+            sample_text = selected["text"]
+
         message = st.text_area("MESSAGE CONTENT", value=sample_text, height=230, placeholder="Paste message text here...")
         if st.button("⚡ ANALYZE MESSAGE", type="primary", use_container_width=True):
            if not message.strip():
