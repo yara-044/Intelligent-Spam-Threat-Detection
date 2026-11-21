@@ -261,18 +261,44 @@ if page == "Message Scanner":
             item["display"] for item in quick_examples
         ]
 
-        sample = st.selectbox("Quick examples", sample_options)
+        
+        if "message_input" not in st.session_state:
+            st.session_state["message_input"] = ""
 
-        sample_text = ""
+        col1, col2, col3 = st.columns(3)
 
-        if sample != "Choose an example...":
-            selected = next(
-                item for item in quick_examples
-                if item["display"] == sample
-            )
-            sample_text = selected["text"]
+        with col1:
+            if st.button("⚠️ Generate SPAM", use_container_width=True):
+                examples = dataset[
+                    dataset["label"].astype(str).str.lower() == "spam"
+                ]["text"]
 
-        message = st.text_area("MESSAGE CONTENT", value=sample_text, height=230, placeholder="Paste message text here...")
+                if not examples.empty:
+                    st.session_state["message_input"] = examples.sample(1).iloc[0]
+                    st.rerun()
+
+        with col2:
+            if st.button("✅ Generate HAM", use_container_width=True):
+                examples = dataset[
+                    dataset["label"].astype(str).str.lower() == "ham"
+                ]["text"]
+
+                if not examples.empty:
+                    st.session_state["message_input"] = examples.sample(1).iloc[0]
+                    st.rerun()
+
+        with col3:
+            if st.button("✍️ Write My Own", use_container_width=True):
+                st.session_state["message_input"] = ""
+                st.rerun()
+
+        message = st.text_area(
+            "MESSAGE CONTENT",
+            height=230,
+            placeholder="Generate an example or write your own message...",
+            key="message_input"
+        )
+
         if st.button("⚡ ANALYZE MESSAGE", type="primary", use_container_width=True):
            if not message.strip():
                 st.warning("Please enter a message first.")
