@@ -311,6 +311,23 @@ if page == "Message Scanner":
             key="message_input"
         )
 
+        model_options = ["Original Project Model"]
+
+        if "custom_trained_models" in st.session_state:
+            model_options.append("Custom Trained Model")
+
+        selected_model = st.selectbox(
+            "🤖 Select Detection Model",
+            model_options
+        )
+
+        active_model = model
+
+        if selected_model == "Custom Trained Model":
+            active_model = st.session_state["custom_trained_models"][
+                st.session_state["custom_best_model"]
+            ]
+
         if st.button("⚡ ANALYZE MESSAGE", type="primary", use_container_width=True):
            if not message.strip():
                 st.warning("Please enter a message first.")
