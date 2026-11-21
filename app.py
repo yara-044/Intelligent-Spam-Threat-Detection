@@ -952,6 +952,29 @@ elif page == "Custom Dataset Training":
         except Exception as e:
             st.error(f"Could not read dataset: {e}")
 
+
+elif page == "Saved Model Details":
+    st.markdown("### 💾 Saved Custom Model")
+    st.caption("Information about your saved custom detection model.")
+
+    details = st.session_state.get("custom_model_details")
+
+    if details:
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric("Model Name", details.get("name", "Unknown"))
+
+        with col2:
+            st.metric("Dataset", details.get("dataset_name", "Unknown"))
+
+        with col3:
+            st.metric("Training Date", details.get("trained_at", "Unknown"))
+
+        st.success("Your custom model is available and loaded.")
+
+    else:
+        st.info("No saved custom model details are available yet.")
        
 else:
     st.markdown("### 🛡️ About the Project")
