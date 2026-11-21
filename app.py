@@ -449,9 +449,10 @@ elif page == "Dataset Explorer":
     st.dataframe(view[["label","label_num","text"]], use_container_width=True, height=430)
     st.download_button("⬇ Download filtered CSV", view.to_csv(index=False).encode("utf-8"),
                        file_name="filtered_spam_ham_dataset.csv", mime="text/csv")
+
 elif page == "Custom Dataset Training":
     st.markdown("### 📂 Custom Dataset Training")
-    st.caption("Upload your own CSV dataset.")
+    st.caption("Upload your own CSV dataset and detect its columns automatically.")
 
     uploaded_file = st.file_uploader(
         "Upload your CSV Dataset",
@@ -463,18 +464,110 @@ elif page == "Custom Dataset Training":
         try:
             custom_data = pd.read_csv(uploaded_file)
 
-            st.success("Dataset uploaded successfully!")
+            if custom_data.empty or len(custom_data.columns) < 2:
+                st.error("The dataset must contain at least two columns.")
+            else:
+                st.success("Dataset uploaded successfully!")
 
-            st.markdown("#### Dataset Preview")
-            st.dataframe(custom_data.head(10), use_container_width=True)
+                st.markdown("#### Dataset Preview")
+                st.dataframe(custom_data.head(10), use_container_width=True)
 
-            st.markdown("#### Dataset Information")
-            st.write(f"Rows: {custom_data.shape[0]}")
-            st.write(f"Columns: {custom_data.shape[1]}")
-            st.write("Column Names:", list(custom_data.columns))
+                st.markdown("#### Dataset Information")
+                st.write(f"Rows: {custom_data.shape[0]}")
+                st.write(f"Columns: {custom_data.shape[1]}")
+
+                columns = list(custom_data.columns)
+
+                text_keywords = [
+                    "text", "message", "content", "body",
+                    "email", "sms", "sentence", "comment"
+                ]
+                label_keywords = [
+                    "label", "class", "category", "target",
+                    "type", "status", "classification"
+                ]
+
+                def find_column(keywords):
+                    for col in columns:
+                        name = str(col).strip().lower()
+                        if any(word in name for word in keywords):
+                            return col
+                    return None
+
+                detected_text = find_column(text_keywords)
+                detected_label = find_column(label_keywords)
+
+                if detected_text is None:
+                    string_columns = [
+                        col for col in columns
+                        if custom_data[col].dtype == "object"
+                    ]
+                    if string_columns:
+                        detected_text = max(
+                            string_columns,
+                            key=lambda col: custom_data[col].astype(str).str.len().mean()
+                        )
+
+                if detected_label is None:
+                    possible_labels = [
+                        col for col in columns
+                        if custom_data[col].nunique(dropna=True) <= 20
+                        and custom_data[col].nunique(dropna=True) >= 2
+                    ]
+                    if possible_labels:
+                        detected_label = min(
+                            possible_labels,
+                            key=lambda col: custom_data[col].nunique(dropna=True)
+                        )
+
+                st.markdown("#### 🔎 Automatic Column Detection")
+
+                if detected_text is None or detected_label is None:
+                    st.warning("Automatic detection was incomplete. Please select the columns manually.")
+                else:
+                    st.success("Columns detected! You can change them if needed.")
+
+                text_index = (
+                    columns.index(detected_text)
+                    if detected_text is not None else 0
+                )
+
+                label_index = (
+                    columns.index(detected_label)
+                    if detected_label is not None else min(1, len(columns) - 1)
+                )
+
+                text_column = st.selectbox(
+                    "Select the message/text column",
+                    columns,
+                    index=text_index,
+                    key="custom_text_column"
+                )
+
+                label_column = st.selectbox(
+                    "Select the class/label column",
+                    columns,
+                    index=label_index,
+                    key="custom_label_column"
+                )
+
+                if text_column == label_column:
+                    st.error("Please select two different columns.")
+                else:
+                    st.markdown("#### Selected Columns")
+                    st.write(f"Message column: **{text_column}**")
+                    st.write(f"Label column: **{label_column}**")
+
+                    st.markdown("#### Label Values")
+                    st.write(
+                        custom_data[label_column]
+                        .value_counts(dropna=False)
+                    )
 
         except Exception as e:
             st.error(f"Could not read dataset: {e}")
+
+       
 else:
     st.markdown("### 🛡️ About the Project")
     st.markdown("""
