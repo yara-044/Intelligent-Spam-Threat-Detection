@@ -669,6 +669,150 @@ elif page == "Custom Dataset Training":
                                 "The dataset must contain examples from both classes."
                             )
 
+                        class_counts = prepared_data["label"].value_counts()
+
+                        if (
+                            prepared_data["label"].nunique() == 2
+                            and class_counts.min() >= 5
+                        ):
+                            st.markdown("---")
+                            st.markdown("### 🚀 Train & Compare Models")
+
+                            if st.button(
+                                "START MODEL TRAINING",
+                                type="primary",
+                                use_container_width=True
+                            ):
+                                X = prepared_data["text"]
+                                y = prepared_data["label"].map({
+                                    "ham": 0,
+                                    "spam": 1
+                                })
+
+                                X_train, X_test, y_train, y_test = train_test_split(
+                                    X,
+                                    y,
+                                    test_size=0.2,
+                                    random_state=42,
+                                    stratify=y
+                                )
+
+                                classifiers = {
+                                    "Multinomial Naive Bayes": MultinomialNB(alpha=0.1),
+                                    "Logistic Regression": LogisticRegression(
+                                        max_iter=2000,
+                                        class_weight="balanced"
+                                    ),
+                                    "Linear SVM": LinearSVC(
+                                        class_weight="balanced",
+                                        random_state=42
+                                    ),
+                                    "Random Forest": RandomForestClassifier(
+                                        n_estimators=300,
+                                        class_weight="balanced",
+                                        random_state=42,
+                                        n_jobs=-1
+                                    )
+                                }
+
+                                results = []
+                                trained_models = {}
+
+                                try:
+                                    with st.spinner(
+                                        "Training four models. Please wait..."
+                                    ):
+                                        for name, classifier in classifiers.items():
+                                            custom_model = make_pipeline(classifier)
+                                            custom_model.fit(X_train, y_train)
+
+                                            predictions = custom_model.predict(X_test)
+
+                                            results.append({
+                                                "Model": name,
+                                                "Accuracy": accuracy_score(
+                                                    y_test, predictions
+                                                ),
+                                                "Precision": precision_score(
+                                                    y_test, predictions,
+                                                    zero_division=0
+                                                ),
+                                                "Recall": recall_score(
+                                                    y_test, predictions,
+                                                    zero_division=0
+                                                ),
+                                                "F1-score": f1_score(
+                                                    y_test, predictions,
+                                                    zero_division=0
+                                                )
+                                            })
+
+                                            trained_models[name] = custom_model
+
+                                        original_predictions = model.predict(X_test)
+
+                                        results.append({
+                                            "Model": "Original Project Model",
+                                            "Accuracy": accuracy_score(
+                                                y_test, original_predictions
+                                            ),
+                                            "Precision": precision_score(
+                                                y_test, original_predictions,
+                                                zero_division=0
+                                            ),
+                                            "Recall": recall_score(
+                                                y_test, original_predictions,
+                                                zero_division=0
+                                            ),
+                                            "F1-score": f1_score(
+                                                y_test, original_predictions,
+                                                zero_division=0
+                                            )
+                                        })
+
+                                    results_df = pd.DataFrame(results)
+                                    results_df = results_df.sort_values(
+                                        "F1-score",
+                                        ascending=False
+                                    )
+
+                                    best_custom_name = results_df[
+                                        results_df["Model"] != "Original Project Model"
+                                    ].iloc[0]["Model"]
+
+                                    st.session_state["custom_training_results"] = results_df
+                                    st.session_state["custom_trained_models"] = trained_models
+                                    st.session_state["custom_best_model"] = best_custom_name
+
+                                    st.success("Training completed successfully!")
+
+                                except Exception as e:
+                                    st.error(f"Training failed: {e}")
+
+                        elif prepared_data["label"].nunique() == 2:
+                            st.warning(
+                                "Each class needs at least 5 valid messages for training."
+                            )
+
+                        if "custom_training_results" in st.session_state:
+                            st.markdown("### 📊 Model Comparison")
+
+                            st.dataframe(
+                                st.session_state["custom_training_results"].style.format({
+                                    "Accuracy": "{:.2%}",
+                                    "Precision": "{:.2%}",
+                                    "Recall": "{:.2%}",
+                                    "F1-score": "{:.2%}"
+                                }),
+                                use_container_width=True,
+                                hide_index=True
+                            )
+
+                            st.success(
+                                "Best custom model: "
+                                + st.session_state["custom_best_model"]
+                            )
+
 
         except Exception as e:
             st.error(f"Could not read dataset: {e}")
