@@ -334,7 +334,7 @@ if page == "Message Scanner":
            else:
                 try:
                     # Predict using the original trained model
-                    prediction = int(model.predict([message])[0])
+                    prediction = int(active_model.predict([message])[0])
                     label = "spam" if prediction == 1 else "ham"
 
                     # Display the analysis result
