@@ -884,17 +884,22 @@ elif page == "Custom Dataset Training":
                  
                                                 current_user.id
                                             )
-
                                             st.session_state["custom_model_loaded_user"] = current_user.id
+
+                                            st.session_state["custom_model_details"] = {
+                                                "name": best_custom_name,
+                                                "dataset_name": uploaded_file.name,
+                                                "trained_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                            }
+
                                             st.success("Your custom model was saved securely to your account.")
 
-                                    except Exception as e:
-                                        st.warning(f"Model trained, but could not be saved: {e}")
+                                            except Exception as e:
+                                                st.warning(f"Model trained, but could not be saved: {e}")
 
-                                    st.success("Training completed successfully!")
-                   
-                                    st.success("Training completed successfully!")
+                                            st.success("Training completed successfully!")
 
+                                            
                                 except Exception as e:
                                     st.error(f"Training failed: {e}")
 
