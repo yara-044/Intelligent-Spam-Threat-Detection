@@ -867,7 +867,7 @@ elif page == "Custom Dataset Training":
                                     st.session_state["custom_training_results"] = results_df
                                     st.session_state["custom_trained_models"] = trained_models
                                     st.session_state["custom_best_model"] = best_custom_name
-                                                                        try:
+                                    try:
                                         current_user = get_current_user()
 
                                         if current_user:
