@@ -558,11 +558,107 @@ elif page == "Custom Dataset Training":
                     st.write(f"Message column: **{text_column}**")
                     st.write(f"Label column: **{label_column}**")
 
-                    st.markdown("#### Label Values")
-                    st.write(
+                    
+                    st.markdown("#### 🏷️ Label Classification")
+
+                    label_values = (
                         custom_data[label_column]
-                        .value_counts(dropna=False)
+                        .dropna()
+                        .astype(str)
+                        .str.strip()
                     )
+
+                    unique_labels = sorted(label_values.unique().tolist())
+
+                    st.write("Detected labels:", unique_labels)
+
+                    if len(unique_labels) != 2:
+                        st.warning(
+                            "This version supports binary classification only. "
+                            "The dataset must contain exactly two different labels."
+                        )
+                    else:
+                        spam_candidates = [
+                            "spam", "junk", "phishing", "malicious",
+                            "fraud", "scam", "suspicious", "1"
+                        ]
+
+                        detected_spam = next(
+                            (
+                                value for value in unique_labels
+                                if value.lower() in spam_candidates
+                            ),
+                            None
+                        )
+
+                        default_index = (
+                            unique_labels.index(detected_spam)
+                            if detected_spam is not None else 0
+                        )
+
+                        spam_label = st.selectbox(
+                            "Which label represents SPAM?",
+                            unique_labels,
+                            index=default_index,
+                            key="custom_spam_label"
+                        )
+
+                        st.info(
+                            "The selected label will become SPAM. "
+                            "The other label will become HAM."
+                        )
+
+                        prepared_data = pd.DataFrame({
+                            "text": custom_data[text_column],
+                            "label": custom_data[label_column]
+                        })
+
+                        prepared_data = prepared_data.dropna(
+                            subset=["text", "label"]
+                        ).copy()
+
+                        prepared_data["text"] = (
+                            prepared_data["text"].astype(str).str.strip()
+                        )
+
+                        prepared_data["label"] = (
+                            prepared_data["label"].astype(str).str.strip()
+                        )
+
+                        prepared_data = prepared_data[
+                            prepared_data["text"] != ""
+                        ]
+
+                        prepared_data["label"] = prepared_data["label"].apply(
+                            lambda value: (
+                                "spam" if value == spam_label else "ham"
+                            )
+                        )
+
+                        prepared_data = prepared_data.drop_duplicates(
+                            subset=["text"]
+                        )
+
+                        st.markdown("#### 📊 Prepared Dataset")
+
+                        st.write(
+                            prepared_data["label"].value_counts()
+                        )
+
+                        st.dataframe(
+                            prepared_data.head(10),
+                            use_container_width=True
+                        )
+
+                        if prepared_data["label"].nunique() == 2:
+                            st.success(
+                                "Dataset labels successfully converted to HAM and SPAM."
+                            )
+                        else:
+                            st.error(
+                                "The dataset must contain examples from both classes."
+                            )
+
 
         except Exception as e:
             st.error(f"Could not read dataset: {e}")
