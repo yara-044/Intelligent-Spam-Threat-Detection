@@ -449,7 +449,32 @@ elif page == "Dataset Explorer":
     st.dataframe(view[["label","label_num","text"]], use_container_width=True, height=430)
     st.download_button("⬇ Download filtered CSV", view.to_csv(index=False).encode("utf-8"),
                        file_name="filtered_spam_ham_dataset.csv", mime="text/csv")
+elif page == "Custom Dataset Training":
+    st.markdown("### 📂 Custom Dataset Training")
+    st.caption("Upload your own CSV dataset.")
 
+    uploaded_file = st.file_uploader(
+        "Upload your CSV Dataset",
+        type=["csv"],
+        key="custom_dataset"
+    )
+
+    if uploaded_file is not None:
+        try:
+            custom_data = pd.read_csv(uploaded_file)
+
+            st.success("Dataset uploaded successfully!")
+
+            st.markdown("#### Dataset Preview")
+            st.dataframe(custom_data.head(10), use_container_width=True)
+
+            st.markdown("#### Dataset Information")
+            st.write(f"Rows: {custom_data.shape[0]}")
+            st.write(f"Columns: {custom_data.shape[1]}")
+            st.write("Column Names:", list(custom_data.columns))
+
+        except Exception as e:
+            st.error(f"Could not read dataset: {e}")
 else:
     st.markdown("### 🛡️ About the Project")
     st.markdown("""
