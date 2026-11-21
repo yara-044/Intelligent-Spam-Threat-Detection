@@ -872,11 +872,14 @@ elif page == "Custom Dataset Training":
                                         current_user = get_current_user()
 
                                         if current_user:
-                                            save_custom_model(
+                                            save_custom_model( 
                                                 {
                                                     "model": trained_models[best_custom_name],
-                                                    "name": best_custom_name
-                                                },
+                                                    "name": best_custom_name,
+                                                    "dataset_name": uploaded_file.name,
+                                                    "trained_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                                } 
+                 
                                                 current_user.id
                                             )
 
