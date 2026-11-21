@@ -4,6 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 import joblib
+import io
 import pandas as pd
 import plotly.express as px
 import streamlit as st
