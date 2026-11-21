@@ -863,10 +863,11 @@ elif page == "Custom Dataset Training":
                                         ascending=False
                                     )
 
+                                    
                                     best_custom_name = results_df[
                                         results_df["Model"] != "Original Project Model"
                                     ].iloc[0]["Model"]
-                                    
+
                                     st.session_state["custom_training_results"] = results_df
                                     st.session_state["custom_trained_models"] = trained_models
                                     st.session_state["custom_best_model"] = best_custom_name
@@ -891,6 +892,7 @@ elif page == "Custom Dataset Training":
                                             st.session_state["custom_model_details"] = model_details
 
                                             st.success("Your custom model was saved securely to your account.")
+
                                     except Exception as e:
                                         st.warning(f"Model trained, but could not be saved: {e}")
 
@@ -899,15 +901,6 @@ elif page == "Custom Dataset Training":
                                 except Exception as e:
                                     st.error(f"Training failed: {e}")
 
-                                    except Exception as e:
-                                        st.warning(f"Model trained, but could not be saved: {e}")
-
-                                    st.success("Training completed successfully!")
-                                  
-
-                                            
-                                except Exception as e:
-                                    st.error(f"Training failed: {e}")
 
                         elif prepared_data["label"].nunique() == 2:
                             st.warning(
