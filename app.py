@@ -100,6 +100,31 @@ if not st.session_state.authenticated:
 
     st.stop()
 
+try:
+    current_user = get_current_user()
+
+    if current_user:
+        loaded_user_id = st.session_state.get("custom_model_loaded_user")
+
+        if loaded_user_id != current_user.id:
+            try:
+                saved_bundle = load_custom_model(current_user.id)
+
+                st.session_state["custom_trained_models"] = {
+                    saved_bundle["name"]: saved_bundle["model"]
+                }
+
+                st.session_state["custom_best_model"] = saved_bundle["name"]
+                st.session_state["custom_model_loaded_user"] = current_user.id
+
+            except Exception:
+                st.session_state.pop("custom_trained_models", None)
+                st.session_state.pop("custom_best_model", None)
+                st.session_state["custom_model_loaded_user"] = current_user.id
+
+except Exception as e:
+    st.warning(f"Could not restore your custom model: {e}")
+
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
