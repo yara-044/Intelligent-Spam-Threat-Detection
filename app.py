@@ -887,7 +887,10 @@ elif page == "Custom Dataset Training":
                                                 current_user.id
                                             )
 
-                                           
+                                            st.session_state["custom_model_loaded_user"] = current_user.id
+                                            st.session_state["custom_model_details"] = model_details
+
+                                            st.success("Your custom model was saved securely to your account.")
                                     except Exception as e:
                                         st.warning(f"Model trained, but could not be saved: {e}")
 
@@ -895,14 +898,6 @@ elif page == "Custom Dataset Training":
 
                                 except Exception as e:
                                     st.error(f"Training failed: {e}")
-
-
-                                    
-
-                                            st.session_state["custom_model_loaded_user"] = current_user.id
-                                            st.session_state["custom_model_details"] = model_details
-
-                                            st.success("Your custom model was saved securely to your account.")
 
                                     except Exception as e:
                                         st.warning(f"Model trained, but could not be saved: {e}")
