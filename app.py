@@ -472,17 +472,17 @@ elif page == "Custom Dataset Training":
 
     if uploaded_file is not None:
         try:
-    uploaded_file.seek(0)
-    custom_data = pd.read_csv(
-        uploaded_file,
-        encoding="utf-8-sig"
-    )
-except UnicodeDecodeError:
-    uploaded_file.seek(0)
-    custom_data = pd.read_csv(
-        uploaded_file,
-        encoding="latin-1"
-    )
+             uploaded_file.seek(0)
+             custom_data = pd.read_csv(
+             uploaded_file,
+             encoding="utf-8-sig"
+            )
+  except UnicodeDecodeError:
+            uploaded_file.seek(0)
+            custom_data = pd.read_csv(
+            uploaded_file,
+            encoding="latin-1"
+           )
             if custom_data.empty or len(custom_data.columns) < 2:
                 st.error("The dataset must contain at least two columns.")
             else:
