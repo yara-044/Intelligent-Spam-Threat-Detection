@@ -823,6 +823,28 @@ elif page == "Custom Dataset Training":
                                 + st.session_state["custom_best_model"]
                             )
 
+                            st.markdown("#### 💾 Save Your Custom Model")
+
+                            best_model_name = st.session_state["custom_best_model"]
+
+                            model_buffer = io.BytesIO()
+
+                            joblib.dump(
+                                {
+                                    "model": st.session_state["custom_trained_models"][best_model_name],
+                                    "name": best_model_name
+                                },
+                                model_buffer
+                            )
+
+                            st.download_button(
+                                "⬇️ Download Best Custom Model",
+                                data=model_buffer.getvalue(),
+                                file_name="custom_spam_model.joblib",
+                                mime="application/octet-stream",
+                                use_container_width=True
+                            )
+
 
         except Exception as e:
             st.error(f"Could not read dataset: {e}")
