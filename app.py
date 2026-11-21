@@ -477,7 +477,7 @@ elif page == "Custom Dataset Training":
              uploaded_file,
              encoding="utf-8-sig"
             )
-  except UnicodeDecodeError:
+        except UnicodeDecodeError:
             uploaded_file.seek(0)
             custom_data = pd.read_csv(
             uploaded_file,
