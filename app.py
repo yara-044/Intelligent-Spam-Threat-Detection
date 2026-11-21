@@ -895,10 +895,10 @@ elif page == "Custom Dataset Training":
                                         st.warning(f"Model trained, but could not be saved: {e}")
 
                                     st.success("Training completed successfully!")
-                                            except Exception as e:
-                                                st.warning(f"Model trained, but could not be saved: {e}")
+                                    except Exception as e:
+                                        st.warning(f"Model trained, but could not be saved: {e}")
 
-                                            st.success("Training completed successfully!")
+                                    st.success("Training completed successfully!")
 
                                             
                                 except Exception as e:
