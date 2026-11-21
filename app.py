@@ -165,6 +165,38 @@ def render_metric(label, value):
         unsafe_allow_html=True,
     )
 
+def get_current_user():
+    response = st.session_state.supabase_client.auth.get_user()
+    return response.user
+
+
+def save_custom_model(model_bundle, user_id):
+    model_path = f"{user_id}/custom_spam_model.joblib"
+
+    model_buffer = io.BytesIO()
+    joblib.dump(model_bundle, model_buffer)
+
+    st.session_state.supabase_client.storage.from_(
+        "custom-models"
+    ).upload(
+        model_path,
+        model_buffer.getvalue(),
+        file_options={
+            "upsert": "true",
+            "content-type": "application/octet-stream"
+        }
+    )
+
+
+def load_custom_model(user_id):
+    model_path = f"{user_id}/custom_spam_model.joblib"
+
+    file_data = st.session_state.supabase_client.storage.from_(
+        "custom-models"
+    ).download(model_path)
+
+    return joblib.load(io.BytesIO(file_data))
+
 with st.sidebar:
     st.markdown("### 👤 Account")
 
