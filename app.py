@@ -3,13 +3,23 @@ from supabase import create_client
 import subprocess
 import sys
 from pathlib import Path
-
 import joblib
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-
 from train_and_evaluate import load_data
+from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import LinearSVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score
+)
+from train_and_evaluate import make_pipeline 
 
 ROOT = Path(__file__).parent
 DATA_PATH = ROOT / "spam_ham_dataset.csv"
