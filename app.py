@@ -175,6 +175,7 @@ with st.sidebar:
         "Scan History",
         "Model Dashboard",
         "Dataset Explorer",
+        "Custom Dataset Training",
         "About Project"
     ]
 )
