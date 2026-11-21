@@ -245,6 +245,7 @@ with st.sidebar:
         "Model Dashboard",
         "Dataset Explorer",
         "Custom Dataset Training",
+        "Saved Model Details",
         "About Project"
     ]
 )
