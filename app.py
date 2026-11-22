@@ -297,17 +297,22 @@ if not model_ready():
             st.code(result.stderr or result.stdout)
     st.stop()
 
+
 try:
     bundle = load_bundle()
     metrics_df = load_metrics()
     dataset = load_data(DATA_PATH)
+
+    st.success("Models and dataset loaded successfully.")
+
 except Exception as exc:
-    st.error(f"Could not load the trained project files: {exc}")
-    st.info("Use 'Retrain model' from the sidebar to rebuild the model output.")
+    st.error("Project loading failed:")
+    st.exception(exc)
     st.stop()
 
 best_name = str(bundle["name"])
 model = bundle["model"]
+
 
 if page == "Message Scanner":
     left, right = st.columns([1.35, .85], gap="large")
