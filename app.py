@@ -307,7 +307,7 @@ try:
     dataset = load_data(DATA_PATH)
    
 
-    st.success("Models and dataset loaded successfully.")
+   
 
 except Exception as exc:
     st.error("Project loading failed:")
