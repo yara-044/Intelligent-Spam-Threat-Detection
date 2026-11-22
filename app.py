@@ -969,23 +969,44 @@ elif page == "Saved Model Details":
 
     details = st.session_state.get("custom_model_details")
 
-    if details:
-        col1, col2, col3 = st.columns(3)
+   if details:
+    col1, col2, col3 = st.columns(3)
 
-        with col1:
-            st.metric("Model Name", details.get("name", "Unknown"))
+    with col1:
+        st.metric("Model Name", details.get("name", "Unknown"))
 
-        with col2:
-            st.metric("Dataset", details.get("dataset_name", "Unknown"))
+    with col2:
+        st.metric("Dataset", details.get("dataset_name", "Unknown"))
 
-        with col3:
-            st.metric("Training Date", details.get("trained_at", "Unknown"))
+    with col3:
+        st.metric("Training Date", details.get("trained_at", "Unknown"))
 
-        st.success("Your custom model is available and loaded.")
+    st.markdown("### 📊 Model Performance")
 
+    if all(key in details for key in [
+        "accuracy", "precision", "recall", "f1_score"
+    ]):
+        metric_cols = st.columns(4)
+
+        metric_cols[0].metric(
+            "Accuracy", f"{details['accuracy']:.2%}"
+        )
+        metric_cols[1].metric(
+            "Precision", f"{details['precision']:.2%}"
+        )
+        metric_cols[2].metric(
+            "Recall", f"{details['recall']:.2%}"
+        )
+        metric_cols[3].metric(
+            "F1-Score", f"{details['f1_score']:.2%}"
+        )
     else:
-        st.info("No saved custom model details are available yet.")
-       
+        st.info("Performance metrics are not available. Train the model again to save them.")
+
+    st.success("Your custom model is available and loaded.")
+
+else:
+    st.info("No saved custom model details are available yet.")
 else:
     st.markdown("### 🛡️ About the Project")
     st.markdown("""
