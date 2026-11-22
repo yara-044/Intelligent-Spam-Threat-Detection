@@ -53,22 +53,28 @@ if "supabase_client" not in st.session_state:
         st.stop()
 
 
-# --------------------------- Gmail OAuth Callback ---------------------------
 
+# Gmail OAuth Callback
 if "code" in st.query_params:
     try:
         from gmail_service import complete_gmail_authorization
 
         code = st.query_params.get("code")
         returned_state = st.query_params.get("state")
+        signature = st.query_params.get("oauth_signature")
 
-        complete_gmail_authorization(code, returned_state)
+        complete_gmail_authorization(
+            code,
+            returned_state,
+            signature
+        )
 
         st.query_params.clear()
         st.success("Gmail connected successfully!")
 
     except Exception as e:
         st.error(f"Gmail authorization failed: {e}")
+
 
 
 # --------------------------- Authentication State ---------------------------
