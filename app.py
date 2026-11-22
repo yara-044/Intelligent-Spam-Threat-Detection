@@ -305,7 +305,7 @@ try:
     bundle = load_bundle()
     metrics_df = load_metrics()
     dataset = load_data(DATA_PATH)
-    st.info("DEBUG 3: Models loaded")
+   
 
     st.success("Models and dataset loaded successfully.")
 
