@@ -963,6 +963,7 @@ elif page == "Custom Dataset Training":
             st.error(f"Could not read dataset: {e}")
 
 
+
 elif page == "Saved Model Details":
     st.markdown("### 💾 Saved Custom Model")
     st.caption("Information about your saved custom detection model.")
@@ -983,9 +984,7 @@ elif page == "Saved Model Details":
 
         st.markdown("### 📊 Model Performance")
 
-        if all(key in details for key in [
-           "accuracy", "precision", "recall", "f1_score"
-       ]):
+        if all(key in details for key in ["accuracy", "precision", "recall", "f1_score"]):
             metric_cols = st.columns(4)
 
             metric_cols[0].metric("Accuracy", f"{details['accuracy']:.2%}")
@@ -997,8 +996,9 @@ elif page == "Saved Model Details":
 
         st.success("Your custom model is available and loaded.")
 
-        else:
-            st.info("No saved custom model details are available yet.") 
+    else:
+        st.info("No saved custom model details are available yet.")
+ 
 else:
     st.markdown("### 🛡️ About the Project")
     st.markdown("""
