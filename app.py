@@ -99,8 +99,27 @@ if not st.session_state.authenticated:
                 except Exception:
                     st.error("Could not create account. Please check your details.")
 
-    st.stop()
     
+st.stop()
+
+# Gmail OAuth Callback
+if "code" in st.query_params:
+    try:
+        from gmail_service import complete_gmail_authorization
+
+        code = st.query_params.get("code")
+        returned_state = st.query_params.get("state")
+
+        complete_gmail_authorization(code, returned_state)
+
+        st.query_params.clear()
+        st.success("Gmail connected successfully!")
+        st.rerun()
+
+    except Exception as e:
+        st.error(f"Gmail authorization failed: {e}")
+
+
 def get_current_user():
     response = st.session_state.supabase_client.auth.get_user()
     return response.user
