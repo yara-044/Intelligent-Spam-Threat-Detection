@@ -161,3 +161,78 @@ def get_gmail_service():
         credentials=credentials,
         cache_discovery=False
     )
+
+import base64
+from email.utils import parseaddr
+
+
+def decode_email_body(payload):
+    """Extract readable email body from Gmail payload."""
+
+    body = ""
+
+    if "parts" in payload:
+        for part in payload["parts"]:
+            body += decode_email_body(part)
+
+    elif payload.get("body", {}).get("data"):
+        data = payload["body"]["data"]
+
+        decoded = base64.urlsafe_b64decode(
+            data + "=" * (-len(data) % 4)
+        )
+
+        mime_type = payload.get("mimeType", "")
+
+        if mime_type == "text/plain":
+            body = decoded.decode("utf-8", errors="replace")
+
+    return body
+
+
+def fetch_latest_emails(max_results=20):
+    """Fetch the latest Gmail messages."""
+
+    service = get_gmail_service()
+
+    if service is None:
+        raise ValueError(
+            "Gmail session expired. Please connect Gmail again."
+        )
+
+    response = service.users().messages().list(
+        userId="me",
+        maxResults=max_results
+    ).execute()
+
+    messages = response.get("messages", [])
+    emails = []
+
+    for message in messages:
+        details = service.users().messages().get(
+            userId="me",
+            id=message["id"],
+            format="full"
+        ).execute()
+
+        payload = details.get("payload", {})
+        headers = payload.get("headers", [])
+
+        header_map = {
+            item["name"].lower(): item["value"]
+            for item in headers
+        }
+
+        body = decode_email_body(payload)
+
+        emails.append({
+            "id": message["id"],
+            "sender": parseaddr(
+                header_map.get("from", "")
+            )[1],
+            "subject": header_map.get("subject", "No Subject"),
+            "date": header_map.get("date", ""),
+            "body": body
+        })
+
+    return emails
