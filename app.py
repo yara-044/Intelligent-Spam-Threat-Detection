@@ -922,7 +922,6 @@ elif page == "Custom Dataset Training":
 
                                     try:
                                         current_user = get_current_user()
-                                        st.info("DEBUG 2: User loaded")
 
                                         
                                         
