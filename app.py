@@ -52,6 +52,7 @@ if "supabase_client" not in st.session_state:
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
+
 if not st.session_state.authenticated:
     st.title("🛡️ Intelligent Spam Detector")
     st.subheader("Welcome")
@@ -68,12 +69,14 @@ if not st.session_state.authenticated:
                     "email": email,
                     "password": password
                 })
+
                 if response.session:
                     st.session_state.authenticated = True
                     st.success("Login successful!")
                     st.rerun()
                 else:
                     st.error("Please verify your email, then try logging in.")
+
             except Exception as e:
                 st.error(f"Login failed: {e}")
 
@@ -99,8 +102,8 @@ if not st.session_state.authenticated:
                 except Exception:
                     st.error("Could not create account. Please check your details.")
 
-    
-st.stop()
+    st.stop()
+
 
 # Gmail OAuth Callback
 if "code" in st.query_params:
