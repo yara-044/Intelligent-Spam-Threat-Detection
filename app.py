@@ -513,28 +513,300 @@ if page == "Message Scanner":
 
 
 elif page == "Email Security":
-    st.markdown("### 📧 Email Security")
-    st.write("Connect your Gmail account to scan incoming emails.")
 
-    if "gmail_credentials" not in st.session_state:
+    from gmail_service import fetch_latest_emails, get_gmail_service
+
+    st.markdown("### 📧 Email Security")
+    st.caption("Scan your Gmail inbox, detect spam, and manage your secure email archive.")
+
+    # Check Gmail connection
+    gmail_service = get_gmail_service()
+
+    if gmail_service is None:
+
+        st.warning("Your Gmail account is not connected or the session has expired.")
+
         try:
             from gmail_service import get_gmail_authorization_url
 
-            st.info("Connect your Gmail account to start email security scanning.")
-
             if st.button("🔗 Connect Gmail", type="primary"):
                 auth_url = get_gmail_authorization_url()
-                st.link_button(
-                    "Authorize Gmail Account",
-                    auth_url,
-                    use_container_width=True
-                )
+                st.link_button("Authorize Gmail Account", auth_url)
 
         except Exception as e:
             st.error(f"Gmail connection error: {e}")
 
     else:
-        st.success("Gmail account connected successfully!")
+
+        st.success("🟢 Gmail account connected successfully!")
+
+        # Select detection model
+        email_model_options = ["Original Project Model"]
+
+        if (
+            "custom_trained_models" in st.session_state
+            and "custom_best_model" in st.session_state
+        ):
+            email_model_options.append("Custom Trained Model")
+
+        selected_email_model = st.selectbox(
+            "Detection Model",
+            email_model_options
+        )
+
+        active_email_model = model
+
+        if selected_email_model == "Custom Trained Model":
+            active_email_model = st.session_state[
+                "custom_trained_models"
+            ][
+                st.session_state["custom_best_model"]
+            ]
+
+        st.markdown("---")
+
+        # Scan settings
+        st.markdown("#### 🔍 Inbox Scanner")
+
+        max_emails = st.number_input(
+            "Number of latest emails to scan",
+            min_value=5,
+            max_value=100,
+            value=20,
+            step=5
+        )
+
+        if st.button(
+            "⚡ SCAN INBOX",
+            type="primary",
+            use_container_width=True
+        ):
+
+            try:
+                current_user = get_current_user()
+
+                if not current_user:
+                    st.error("Please log in again.")
+                    st.stop()
+
+                with st.spinner("Reading and analyzing your Gmail messages..."):
+
+                    emails = fetch_latest_emails(
+                        max_results=int(max_emails)
+                    )
+
+                    archive_records = []
+
+                    for email in emails:
+
+                        email_text = (
+                            f"Subject: {email.get('subject', '')}\n"
+                            f"From: {email.get('sender', '')}\n"
+                            f"{email.get('body', '')}"
+                        )
+
+                        if not email_text.strip():
+                            continue
+
+                        prediction = int(
+                            active_email_model.predict([email_text])[0]
+                        )
+
+                        classification = (
+                            "SPAM" if prediction == 1 else "HAM"
+                        )
+
+                        archive_records.append({
+                            "user_id": current_user.id,
+                            "gmail_message_id": email["id"],
+                            "sender": email.get("sender", ""),
+                            "subject": email.get("subject", ""),
+                            "email_body": email.get("body", ""),
+                            "email_date": email.get("date", ""),
+                            "classification": classification
+                        })
+
+                    if archive_records:
+
+                        (
+                            st.session_state.supabase_client
+                            .table("email_scan_archive")
+                            .upsert(
+                                archive_records,
+                                on_conflict="user_id,gmail_message_id"
+                            )
+                            .execute()
+                        )
+
+                        st.success(
+                            f"Successfully scanned and archived "
+                            f"{len(archive_records)} emails."
+                        )
+
+                    else:
+                        st.info("No readable emails were found.")
+
+            except Exception as e:
+                st.error(f"Email scanning failed: {e}")
+
+        st.markdown("---")
+
+        # Load user's private archive
+        st.markdown("### 📁 Email Archive")
+
+        try:
+            current_user = get_current_user()
+
+            archive_response = (
+                st.session_state.supabase_client
+                .table("email_scan_archive")
+                .select(
+                    "id, gmail_message_id, sender, subject, "
+                    "email_body, email_date, classification, scanned_at"
+                )
+                .eq("user_id", current_user.id)
+                .order("scanned_at", desc=True)
+                .limit(500)
+                .execute()
+            )
+
+            archive_data = archive_response.data or []
+
+            if archive_data:
+
+                archive_df = pd.DataFrame(archive_data)
+
+                total_emails = len(archive_df)
+
+                spam_count = int(
+                    (archive_df["classification"] == "SPAM").sum()
+                )
+
+                ham_count = int(
+                    (archive_df["classification"] == "HAM").sum()
+                )
+
+                metric1, metric2, metric3 = st.columns(3)
+
+                metric1.metric("Archived Emails", total_emails)
+                metric2.metric("HAM Emails", ham_count)
+                metric3.metric("SPAM Emails", spam_count)
+
+                st.markdown("#### Filter Archive")
+
+                selected_filter = st.selectbox(
+                    "Classification",
+                    ["ALL", "HAM", "SPAM"]
+                )
+
+                filtered_df = archive_df.copy()
+
+                if selected_filter != "ALL":
+                    filtered_df = filtered_df[
+                        filtered_df["classification"] == selected_filter
+                    ]
+
+                st.dataframe(
+                    filtered_df[
+                        [
+                            "sender",
+                            "subject",
+                            "classification",
+                            "email_date",
+                            "scanned_at"
+                        ]
+                    ],
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+                # View individual email details
+                st.markdown("#### Email Details")
+
+                for _, email_row in filtered_df.iterrows():
+
+                    label = email_row["classification"]
+
+                    icon = "⚠️" if label == "SPAM" else "✅"
+
+                    with st.expander(
+                        f"{icon} {label} — {email_row['subject'] or 'No Subject'}"
+                    ):
+
+                        st.write("**Sender:**", email_row["sender"])
+                        st.write("**Email Date:**", email_row["email_date"])
+                        st.write("**Classification:**", label)
+
+                        st.markdown("**Message Content:**")
+
+                        st.text(
+                            email_row["email_body"] or "No readable text content."
+                        )
+
+                # Export filtered archive
+                st.markdown("---")
+                st.markdown("#### 📥 Export Archive")
+
+                export_df = filtered_df[
+                    [
+                        "sender",
+                        "subject",
+                        "email_body",
+                        "email_date",
+                        "classification",
+                        "scanned_at"
+                    ]
+                ]
+
+                csv_data = export_df.to_csv(
+                    index=False,
+                    encoding="utf-8-sig"
+                )
+
+                st.download_button(
+                    "⬇ Download CSV",
+                    data=csv_data,
+                    file_name="gmail_security_archive.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+
+                try:
+                    excel_buffer = io.BytesIO()
+
+                    with pd.ExcelWriter(
+                        excel_buffer,
+                        engine="openpyxl"
+                    ) as writer:
+
+                        export_df.to_excel(
+                            writer,
+                            index=False,
+                            sheet_name="Email Archive"
+                        )
+
+                    st.download_button(
+                        "⬇ Download Excel",
+                        data=excel_buffer.getvalue(),
+                        file_name="gmail_security_archive.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
+
+                except Exception as excel_error:
+                    st.warning(
+                        "Excel export is unavailable. CSV export is ready."
+                    )
+
+            else:
+                st.info(
+                    "Your email archive is empty. "
+                    "Click SCAN INBOX to analyze your Gmail messages."
+                )
+
+        except Exception as e:
+            st.error(f"Could not load email archive: {e}")
+
 
 elif page == "Scan History":
     st.markdown("### 🕘 Scan History")
