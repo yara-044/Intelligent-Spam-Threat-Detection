@@ -55,6 +55,7 @@ if "supabase_client" not in st.session_state:
 
 
 
+
 # Gmail OAuth Callback
 if "code" in st.query_params:
     try:
@@ -69,6 +70,7 @@ if "code" in st.query_params:
         st.success("Gmail connected successfully!")
 
     except Exception as e:
+        st.query_params.clear()
         st.error(f"Gmail authorization failed: {e}")
 
 
