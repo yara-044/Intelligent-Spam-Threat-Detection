@@ -39,6 +39,9 @@ st.set_page_config(
 )
 
 # --------------------------- User Authentication ---------------------------
+
+# --------------------------- User Authentication ---------------------------
+
 if "supabase_client" not in st.session_state:
     try:
         st.session_state.supabase_client = create_client(
@@ -49,63 +52,9 @@ if "supabase_client" not in st.session_state:
         st.error("Authentication setup error. Please check Supabase Secrets.")
         st.stop()
 
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
 
+# --------------------------- Gmail OAuth Callback ---------------------------
 
-if not st.session_state.authenticated:
-    st.title("🛡️ Intelligent Spam Detector")
-    st.subheader("Welcome")
-
-    login_tab, signup_tab = st.tabs(["Login", "Create Account"])
-
-    with login_tab:
-        email = st.text_input("Email", key="login_email")
-        password = st.text_input("Password", type="password", key="login_password")
-
-        if st.button("Login", use_container_width=True):
-            try:
-                response = st.session_state.supabase_client.auth.sign_in_with_password({
-                    "email": email,
-                    "password": password
-                })
-
-                if response.session:
-                    st.session_state.authenticated = True
-                    st.success("Login successful!")
-                    st.rerun()
-                else:
-                    st.error("Please verify your email, then try logging in.")
-
-            except Exception as e:
-                st.error(f"Login failed: {e}")
-
-    with signup_tab:
-        new_email = st.text_input("Email", key="signup_email")
-        new_password = st.text_input("Password", type="password", key="signup_password")
-        confirm_password = st.text_input("Confirm Password", type="password")
-
-        if st.button("Create Account", use_container_width=True):
-            if not new_email or not new_password:
-                st.warning("Please fill in all fields.")
-            elif new_password != confirm_password:
-                st.error("Passwords do not match.")
-            elif len(new_password) < 8:
-                st.error("Password must be at least 8 characters.")
-            else:
-                try:
-                    response = st.session_state.supabase_client.auth.sign_up({
-                        "email": new_email,
-                        "password": new_password
-                    })
-                    st.success("Account created! Check your email if verification is required.")
-                except Exception:
-                    st.error("Could not create account. Please check your details.")
-
-    st.stop()
-
-
-# Gmail OAuth Callback
 if "code" in st.query_params:
     try:
         from gmail_service import complete_gmail_authorization
@@ -117,10 +66,100 @@ if "code" in st.query_params:
 
         st.query_params.clear()
         st.success("Gmail connected successfully!")
-        st.rerun()
 
     except Exception as e:
         st.error(f"Gmail authorization failed: {e}")
+
+
+# --------------------------- Authentication State ---------------------------
+
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+
+# --------------------------- Login and Signup ---------------------------
+
+if not st.session_state.authenticated:
+
+    st.title("🛡️ Intelligent Spam Detector")
+    st.subheader("Welcome")
+
+    login_tab, signup_tab = st.tabs(["Login", "Create Account"])
+
+    with login_tab:
+
+        email = st.text_input("Email", key="login_email")
+        password = st.text_input(
+            "Password",
+            type="password",
+            key="login_password"
+        )
+
+        if st.button("Login", use_container_width=True):
+
+            try:
+                response = st.session_state.supabase_client.auth.sign_in_with_password({
+                    "email": email,
+                    "password": password
+                })
+
+                if response.session:
+                    st.session_state.authenticated = True
+                    st.success("Login successful!")
+                    st.rerun()
+
+                else:
+                    st.error(
+                        "Please verify your email, then try logging in."
+                    )
+
+            except Exception as e:
+                st.error(f"Login failed: {e}")
+
+    with signup_tab:
+
+        new_email = st.text_input("Email", key="signup_email")
+
+        new_password = st.text_input(
+            "Password",
+            type="password",
+            key="signup_password"
+        )
+
+        confirm_password = st.text_input(
+            "Confirm Password",
+            type="password"
+        )
+
+        if st.button("Create Account", use_container_width=True):
+
+            if not new_email or not new_password:
+                st.warning("Please fill in all fields.")
+
+            elif new_password != confirm_password:
+                st.error("Passwords do not match.")
+
+            elif len(new_password) < 8:
+                st.error("Passwords must be at least 8 characters.")
+
+            else:
+                try:
+                    response = st.session_state.supabase_client.auth.sign_up({
+                        "email": new_email,
+                        "password": new_password
+                    })
+
+                    st.success(
+                        "Account created! Check your email if verification is required."
+                    )
+
+                except Exception:
+                    st.error(
+                        "Could not create account. Please check your details."
+                    )
+
+    st.stop()
+
 
 
 def get_current_user():
