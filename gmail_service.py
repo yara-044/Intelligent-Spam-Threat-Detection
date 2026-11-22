@@ -1,5 +1,9 @@
 
 import streamlit as st
+import secrets
+import hashlib
+import hmac
+from urllib.parse import urlencode
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 
@@ -32,28 +36,49 @@ def create_gmail_flow(state=None):
 
 
 def get_gmail_authorization_url():
-    flow = create_gmail_flow()
+    state = secrets.token_urlsafe(32)
 
-    authorization_url, state = flow.authorization_url(
+    flow = create_gmail_flow(state=state)
+
+    authorization_url, _ = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
         prompt="consent"
     )
 
+    # Keep state in the URL's signed session-independent form
+    secret = st.secrets["GMAIL_OAUTH_STATE_SECRET"]
+    signature = hmac.new(
+        secret.encode(),
+        state.encode(),
+        hashlib.sha256
+    ).hexdigest()
+
     st.session_state["gmail_oauth_state"] = state
-    return authorization_url
+
+    return authorization_url, state, signature
 
 
-def complete_gmail_authorization(code, returned_state):
-    saved_state = st.session_state.get("gmail_oauth_state")
+def complete_gmail_authorization(code, returned_state, signature):
+    if not returned_state or not signature:
+        raise ValueError("Missing OAuth state information.")
 
-    if not saved_state or returned_state != saved_state:
-        raise ValueError("Invalid OAuth state. Please try connecting again.")
+    secret = st.secrets["GMAIL_OAUTH_STATE_SECRET"]
 
-    flow = create_gmail_flow(state=saved_state)
+    expected_signature = hmac.new(
+        secret.encode(),
+        returned_state.encode(),
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(signature, expected_signature):
+        raise ValueError("Invalid OAuth state signature.")
+
+    flow = create_gmail_flow(state=returned_state)
     flow.fetch_token(code=code)
 
     credentials = flow.credentials
+
     st.session_state["gmail_credentials"] = credentials
     st.session_state.pop("gmail_oauth_state", None)
 
