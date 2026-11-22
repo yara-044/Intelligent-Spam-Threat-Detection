@@ -892,7 +892,7 @@ elif page == "Custom Dataset Training":
                                                "f1_score": float(best_row["F1-score"])
                                            }
 
-                                            save_custom_model(
+                                        save_custom_model(
                                                 model_details,
                                                 current_user.id
                                             )
