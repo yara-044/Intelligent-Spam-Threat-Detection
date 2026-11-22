@@ -875,27 +875,28 @@ elif page == "Custom Dataset Training":
                                     try:
                                         current_user = get_current_user()
 
+                                        
                                         if current_user:
-                                            
-                                           best_row = results_df[
-                                               results_df["Model"] == best_custom_name
-                                           ].iloc[0]
+                                            best_row = results_df[
+                                                results_df["Model"] == best_custom_name
+                                            ].iloc[0]
 
-                                           model_details = {
-                                               "model": trained_models[best_custom_name],
-                                               "name": best_custom_name,
-                                               "dataset_name": uploaded_file.name,
-                                               "trained_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                               "accuracy": float(best_row["Accuracy"]),
-                                               "precision": float(best_row["Precision"]),
-                                               "recall": float(best_row["Recall"]),
-                                               "f1_score": float(best_row["F1-score"])
-                                           }
+                                            model_details = {
+                                                "model": trained_models[best_custom_name],
+                                                "name": best_custom_name,
+                                                "dataset_name": uploaded_file.name,
+                                                "trained_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                                "accuracy": float(best_row["Accuracy"]),
+                                                "precision": float(best_row["Precision"]),
+                                                "recall": float(best_row["Recall"]),
+                                                "f1_score": float(best_row["F1-score"])
+                                            }
 
-                                        save_custom_model(
+                                            save_custom_model(
                                                 model_details,
                                                 current_user.id
                                             )
+
 
                                             st.session_state["custom_model_loaded_user"] = current_user.id
                                             st.session_state["custom_model_details"] = model_details
