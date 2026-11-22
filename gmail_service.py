@@ -35,10 +35,24 @@ def create_gmail_flow(state=None):
     return flow
 
 
-def get_gmail_authorization_url():
-    state = secrets.token_urlsafe(32)
 
-    flow = create_gmail_flow(state=state)
+def get_gmail_authorization_url():
+    import secrets
+    import hashlib
+    import hmac
+
+    secret = st.secrets["GMAIL_OAUTH_STATE_SECRET"]
+    nonce = secrets.token_urlsafe(32)
+
+    signature = hmac.new(
+        secret.encode(),
+        nonce.encode(),
+        hashlib.sha256
+    ).hexdigest()
+
+    signed_state = f"{nonce}.{signature}"
+
+    flow = create_gmail_flow(state=signed_state)
 
     authorization_url, _ = flow.authorization_url(
         access_type="offline",
@@ -46,41 +60,37 @@ def get_gmail_authorization_url():
         prompt="consent"
     )
 
-    # Keep state in the URL's signed session-independent form
-    secret = st.secrets["GMAIL_OAUTH_STATE_SECRET"]
-    signature = hmac.new(
-        secret.encode(),
-        state.encode(),
-        hashlib.sha256
-    ).hexdigest()
-
-    st.session_state["gmail_oauth_state"] = state
-
-    return authorization_url, state, signature
+    return authorization_url
 
 
-def complete_gmail_authorization(code, returned_state, signature):
-    if not returned_state or not signature:
-        raise ValueError("Missing OAuth state information.")
+def complete_gmail_authorization(code, returned_state):
+    import hashlib
+    import hmac
+
+    if not returned_state or "." not in returned_state:
+        raise ValueError("Invalid OAuth state.")
+
+    nonce, received_signature = returned_state.rsplit(".", 1)
 
     secret = st.secrets["GMAIL_OAUTH_STATE_SECRET"]
 
     expected_signature = hmac.new(
         secret.encode(),
-        returned_state.encode(),
+        nonce.encode(),
         hashlib.sha256
     ).hexdigest()
 
-    if not hmac.compare_digest(signature, expected_signature):
+    if not hmac.compare_digest(
+        received_signature,
+        expected_signature
+    ):
         raise ValueError("Invalid OAuth state signature.")
 
     flow = create_gmail_flow(state=returned_state)
     flow.fetch_token(code=code)
 
     credentials = flow.credentials
-
     st.session_state["gmail_credentials"] = credentials
-    st.session_state.pop("gmail_oauth_state", None)
 
     return credentials
 
