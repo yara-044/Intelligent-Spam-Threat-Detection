@@ -100,7 +100,13 @@ if not st.session_state.authenticated:
                     st.error("Could not create account. Please check your details.")
 
     st.stop()
-    def save_custom_model(model_bundle, user_id):
+    
+def get_current_user():
+    response = st.session_state.supabase_client.auth.get_user()
+    return response.user
+
+
+def save_custom_model(model_bundle, user_id):
     model_path = f"{user_id}/custom_spam_model.joblib"
 
     model_buffer = io.BytesIO()
@@ -126,6 +132,7 @@ def load_custom_model(user_id):
     ).download(model_path)
 
     return joblib.load(io.BytesIO(file_data))
+
 
 try:
     current_user = get_current_user()
@@ -217,10 +224,6 @@ def render_metric(label, value):
         f"<div class='metric-value'>{value}</div></div>",
         unsafe_allow_html=True,
     )
-
-def get_current_user():
-    response = st.session_state.supabase_client.auth.get_user()
-    return response.user
 
 with st.sidebar:
     st.markdown("### 👤 Account")
