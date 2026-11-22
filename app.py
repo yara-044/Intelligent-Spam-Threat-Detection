@@ -438,7 +438,23 @@ if page == "Message Scanner":
         with st.expander("View analyzed message"):
             st.code(result["message"], language=None)
         st.caption("The prediction follows predict_message.py. The current prediction script returns a class label only, so no confidence percentage is displayed.")
+elif page == "Email Security":
+    st.markdown("### 📧 Email Security")
+    st.write("Connect your Gmail account to scan incoming emails.")
 
+    if "gmail_credentials" not in st.session_state:
+        if st.button("🔗 Connect Gmail", type="primary"):
+            try:
+                from gmail_service import get_gmail_authorization_url
+
+                auth_url = get_gmail_authorization_url()
+                st.link_button("Authorize Gmail Account", auth_url)
+
+            except Exception as e:
+                st.error(f"Gmail connection error: {e}")
+
+    else:
+        st.success("Gmail account connected successfully!")
 elif page == "Scan History":
     st.markdown("### 🕘 Scan History")
     st.caption("Your previous message analysis results.")
