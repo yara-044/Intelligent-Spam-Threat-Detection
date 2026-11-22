@@ -992,13 +992,13 @@ elif page == "Saved Model Details":
             metric_cols[1].metric("Precision", f"{details['precision']:.2%}")
             metric_cols[2].metric("Recall", f"{details['recall']:.2%}")
             metric_cols[3].metric("F1-Score", f"{details['f1_score']:.2%}")
-       else:
-           st.info("Performance metrics are not available. Train the model again to save them.")
+        else:
+            st.info("Performance metrics are not available. Train the model again to save them.")
 
-       st.success("Your custom model is available and loaded.")
+        st.success("Your custom model is available and loaded.")
 
-     else:
-         st.info("No saved custom model details are available yet.") 
+        else:
+            st.info("No saved custom model details are available yet.") 
 else:
     st.markdown("### 🛡️ About the Project")
     st.markdown("""
