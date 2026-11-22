@@ -54,6 +54,7 @@ if "supabase_client" not in st.session_state:
 
 
 
+
 # Gmail OAuth Callback
 if "code" in st.query_params:
     try:
@@ -61,19 +62,15 @@ if "code" in st.query_params:
 
         code = st.query_params.get("code")
         returned_state = st.query_params.get("state")
-        signature = st.query_params.get("oauth_signature")
 
-        complete_gmail_authorization(
-            code,
-            returned_state,
-            signature
-        )
+        complete_gmail_authorization(code, returned_state)
 
         st.query_params.clear()
         st.success("Gmail connected successfully!")
 
     except Exception as e:
         st.error(f"Gmail authorization failed: {e}")
+
 
 
 
@@ -512,6 +509,7 @@ if page == "Message Scanner":
             st.code(result["message"], language=None)
         st.caption("The prediction follows predict_message.py. The current prediction script returns a class label only, so no confidence percentage is displayed.")
 
+
 elif page == "Email Security":
     st.markdown("### 📧 Email Security")
     st.write("Connect your Gmail account to scan incoming emails.")
@@ -520,9 +518,15 @@ elif page == "Email Security":
         try:
             from gmail_service import get_gmail_authorization_url
 
+            st.info("Connect your Gmail account to start email security scanning.")
+
             if st.button("🔗 Connect Gmail", type="primary"):
                 auth_url = get_gmail_authorization_url()
-                st.link_button("Authorize Gmail Account", auth_url)
+                st.link_button(
+                    "Authorize Gmail Account",
+                    auth_url,
+                    use_container_width=True
+                )
 
         except Exception as e:
             st.error(f"Gmail connection error: {e}")
