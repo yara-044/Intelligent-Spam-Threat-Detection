@@ -178,7 +178,7 @@ try:
 
 except Exception as e:
     st.warning(f"Could not restore your custom model: {e}")
-
+st.info("DEBUG 1: Login completed")
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
