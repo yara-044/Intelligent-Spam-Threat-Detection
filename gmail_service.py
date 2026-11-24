@@ -93,6 +93,31 @@ def complete_gmail_authorization(code: str, returned_state: str):
     return credentials
 
 
+def get_gmail_account_email(service=None) -> str:
+    """Return the email address of the currently connected Gmail mailbox."""
+    service = service or get_gmail_service()
+    if service is None:
+        raise ValueError("Gmail session expired. Please connect Gmail again.")
+
+    profile = service.users().getProfile(userId="me").execute()
+    email_address = str(profile.get("emailAddress", "")).strip().lower()
+    if not email_address:
+        raise ValueError("Google did not return the connected Gmail address.")
+    return email_address
+
+
+def get_gmail_account_email(service=None) -> str:
+    """Return the email address of the currently connected Gmail mailbox."""
+    service = service or get_gmail_service()
+    if service is None:
+        raise ValueError("Gmail session expired. Please connect Gmail again.")
+    profile = service.users().getProfile(userId="me").execute()
+    email_address = str(profile.get("emailAddress", "")).strip().lower()
+    if not email_address:
+        raise ValueError("Google did not return the connected Gmail address.")
+    return email_address
+
+
 def get_gmail_service():
     credentials = st.session_state.get("gmail_credentials")
     if not credentials:

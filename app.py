@@ -17,6 +17,8 @@ from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
@@ -300,12 +302,34 @@ def render_metric(label, value):
     )
 
 
+def _shape_arabic_line(value):
+    try:
+        import arabic_reshaper
+        from bidi.algorithm import get_display
+        return get_display(arabic_reshaper.reshape(value))
+    except Exception:
+        return value
+
+
 def _pdf_text(value, limit=5000):
     text_value = "" if value is None else str(value)
     text_value = text_value[:limit]
-    return escape(text_value).replace("\n", "<br/>").encode(
-        "latin-1", errors="replace"
-    ).decode("latin-1")
+    shaped_lines = [_shape_arabic_line(line) for line in text_value.splitlines()]
+    return "<br/>".join(escape(line) for line in shaped_lines)
+
+
+def _register_pdf_font():
+    font_name = "ProjectUnicode"
+    if font_name not in pdfmetrics.getRegisteredFontNames():
+        candidates = [
+            ROOT / "fonts" / "DejaVuSans.ttf",
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+        ]
+        for font_path in candidates:
+            if font_path.exists():
+                pdfmetrics.registerFont(TTFont(font_name, str(font_path)))
+                return font_name
+    return font_name if font_name in pdfmetrics.getRegisteredFontNames() else "Helvetica"
 
 
 def _build_pdf(title, subtitle, rows, disclaimer):
@@ -321,23 +345,24 @@ def _build_pdf(title, subtitle, rows, disclaimer):
         author="Intelligent Spam & Threat Detection System",
     )
     styles = getSampleStyleSheet()
+    pdf_font = _register_pdf_font()
     styles.add(ParagraphStyle(
-        name="ReportTitle", parent=styles["Title"],
+        name="ReportTitle", parent=styles["Title"], fontName=pdf_font,
         textColor=colors.HexColor("#252525"), alignment=TA_CENTER,
         fontSize=17, leading=21, spaceAfter=8
     ))
     styles.add(ParagraphStyle(
-        name="ReportSubtitle", parent=styles["Normal"],
+        name="ReportSubtitle", parent=styles["Normal"], fontName=pdf_font,
         alignment=TA_CENTER, textColor=colors.HexColor("#666666"),
         fontSize=9, leading=13, spaceAfter=16
     ))
     styles.add(ParagraphStyle(
-        name="ReportHeading", parent=styles["Heading2"],
+        name="ReportHeading", parent=styles["Heading2"], fontName=pdf_font,
         textColor=colors.HexColor("#8a7600"), fontSize=11,
         leading=14, spaceBefore=10, spaceAfter=5
     ))
     styles.add(ParagraphStyle(
-        name="ReportBody", parent=styles["BodyText"],
+        name="ReportBody", parent=styles["BodyText"], fontName=pdf_font,
         fontSize=8.5, leading=12, spaceAfter=5, wordWrap="CJK"
     ))
     story = [
@@ -354,7 +379,7 @@ def _build_pdf(title, subtitle, rows, disclaimer):
         Spacer(1, 8),
         Paragraph(
             _pdf_text("Generated: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-            styles["Italic"]
+            ParagraphStyle("ReportItalic", parent=styles["Italic"], fontName=pdf_font)
         ),
     ])
     document.build(story)
@@ -645,7 +670,7 @@ if page == "Message Scanner":
 
 elif page == "Email Security":
 
-    from gmail_service import fetch_latest_emails, get_gmail_service
+    from gmail_service import fetch_latest_emails, get_gmail_service, get_gmail_account_email, get_gmail_account_email
 
     st.markdown("### 📧 Email Security")
     st.caption("Scan your Gmail inbox, detect spam, and manage your secure email archive.")
@@ -670,6 +695,8 @@ elif page == "Email Security":
     else:
 
         st.success("🟢 Gmail account connected successfully!")
+        gmail_account_email = get_gmail_account_email(gmail_service)
+        st.caption(f"Connected Gmail: {gmail_account_email}")
 
         # Select detection model
         email_model_options = ["Original Project Model"]
@@ -722,6 +749,11 @@ elif page == "Email Security":
 
                 with st.spinner("Reading and analyzing your Gmail messages..."):
 
+                    # Identify the connected Gmail mailbox so each mailbox has
+                    # an independent archive, even under the same app login.
+                    gmail_account_email = get_gmail_account_email(gmail_service)
+                    # Keep each connected Gmail mailbox in its own archive.
+                    gmail_account_email = get_gmail_account_email(gmail_service)
                     emails = fetch_latest_emails(
                         max_results=int(max_emails)
                     )
@@ -749,6 +781,7 @@ elif page == "Email Security":
 
                         archive_records.append({
                             "user_id": current_user.id,
+                            "gmail_account_email": gmail_account_email,
                             "gmail_message_id": email["id"],
                             "sender": email.get("sender", ""),
                             "subject": email.get("subject", ""),
@@ -764,7 +797,7 @@ elif page == "Email Security":
                             .table("email_scan_archive")
                             .upsert(
                                 archive_records,
-                                on_conflict="user_id,gmail_message_id"
+                                on_conflict="user_id,gmail_account_email,gmail_message_id"
                             )
                             .execute()
                         )
@@ -792,10 +825,11 @@ elif page == "Email Security":
                 st.session_state.supabase_client
                 .table("email_scan_archive")
                 .select(
-                    "id, gmail_message_id, sender, subject, "
+                    "id, gmail_account_email, gmail_message_id, sender, subject, "
                     "email_body, email_date, classification, scanned_at"
                 )
                 .eq("user_id", current_user.id)
+                .eq("gmail_account_email", gmail_account_email)
                 .order("scanned_at", desc=True)
                 .limit(500)
                 .execute()
