@@ -17,6 +17,8 @@ from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
@@ -29,7 +31,8 @@ from sklearn.metrics import (
     recall_score,
     f1_score
 )
-from train_and_evaluate import make_pipeline 
+from train_and_evaluate import make_pipeline
+from prediction_utils import classify_message
 
 ROOT = Path(__file__).parent
 DATA_PATH = ROOT / "spam_ham_dataset.csv"
@@ -71,11 +74,14 @@ if "code" in st.query_params:
 
         code = st.query_params.get("code")
         returned_state = st.query_params.get("state")
-
-        complete_gmail_authorization(code, returned_state)
-
+        auth_user = st.session_state.supabase_client.auth.get_user().user
+        if not auth_user:
+            raise ValueError("Please sign in to the app before connecting Gmail.")
+        mailbox = complete_gmail_authorization(
+            code, returned_state, st.session_state.supabase_client, auth_user.id
+        )
         st.query_params.clear()
-        st.success("Gmail connected successfully!")
+        st.session_state["gmail_connected_notice"] = mailbox
 
     except Exception as e:
         st.query_params.clear()
@@ -322,12 +328,31 @@ def render_metric(label, value):
     )
 
 
+def _shape_arabic_line(value):
+    try:
+        import arabic_reshaper
+        from bidi.algorithm import get_display
+        return get_display(arabic_reshaper.reshape(value))
+    except Exception:
+        return value
+
+
 def _pdf_text(value, limit=5000):
     text_value = "" if value is None else str(value)
     text_value = text_value[:limit]
-    return escape(text_value).replace("\n", "<br/>").encode(
-        "latin-1", errors="replace"
-    ).decode("latin-1")
+    shaped_lines = [_shape_arabic_line(line) for line in text_value.splitlines()]
+    return "<br/>".join(escape(line) for line in shaped_lines)
+
+
+def _register_pdf_font():
+    font_name = "ProjectUnicode"
+    if font_name not in pdfmetrics.getRegisteredFontNames():
+        candidates = [ROOT / "fonts" / "DejaVuSans.ttf", Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")]
+        for font_path in candidates:
+            if font_path.exists():
+                pdfmetrics.registerFont(TTFont(font_name, str(font_path)))
+                break
+    return font_name if font_name in pdfmetrics.getRegisteredFontNames() else "Helvetica"
 
 
 def _build_pdf(title, subtitle, rows, disclaimer):
@@ -343,24 +368,25 @@ def _build_pdf(title, subtitle, rows, disclaimer):
         author="Intelligent Spam & Threat Detection System",
     )
     styles = getSampleStyleSheet()
+    pdf_font = _register_pdf_font()
     styles.add(ParagraphStyle(
         name="ReportTitle", parent=styles["Title"],
         textColor=colors.HexColor("#252525"), alignment=TA_CENTER,
-        fontSize=17, leading=21, spaceAfter=8
+        fontName=pdf_font, fontSize=17, leading=21, spaceAfter=8
     ))
     styles.add(ParagraphStyle(
         name="ReportSubtitle", parent=styles["Normal"],
         alignment=TA_CENTER, textColor=colors.HexColor("#666666"),
-        fontSize=9, leading=13, spaceAfter=16
+        fontName=pdf_font, fontSize=9, leading=13, spaceAfter=16
     ))
     styles.add(ParagraphStyle(
         name="ReportHeading", parent=styles["Heading2"],
-        textColor=colors.HexColor("#8a7600"), fontSize=11,
+        textColor=colors.HexColor("#8a7600"), fontName=pdf_font, fontSize=11,
         leading=14, spaceBefore=10, spaceAfter=5
     ))
     styles.add(ParagraphStyle(
         name="ReportBody", parent=styles["BodyText"],
-        fontSize=8.5, leading=12, spaceAfter=5, wordWrap="CJK"
+        fontName=pdf_font, fontSize=8.5, leading=12, spaceAfter=5, wordWrap="CJK"
     ))
     story = [
         Paragraph(_pdf_text(title), styles["ReportTitle"]),
@@ -424,7 +450,9 @@ def build_archive_pdf(archive_frame):
 
 
 def build_spam_message_pdf(email_row):
-    digest = _message_archive_hash(email_row)
+    digest = str(email_row.get("sha256") or _message_archive_hash(email_row))
+    hash_scope = ("Original Gmail RFC822 message bytes" if email_row.get("sha256") else
+                  "Archived message fields (legacy record; not the original RFC822 bytes)")
     rows = [
         ("Classification", "SPAM — automated machine-learning classification"),
         ("Sender", str(email_row.get("sender", ""))),
@@ -432,7 +460,7 @@ def build_spam_message_pdf(email_row):
         ("Email date", str(email_row.get("email_date", ""))),
         ("Gmail message ID", str(email_row.get("gmail_message_id", ""))),
         ("SHA-256", digest),
-        ("Hash scope", "SHA-256 of the archived message fields (Gmail message ID, sender, subject, date, body, and classification). This is not a hash of the original RFC822 source bytes."),
+        ("Hash scope", hash_scope),
         ("Message content", str(email_row.get("email_body", ""))[:8000]),
         ("Technical finding", "The selected classifier assigned the SPAM label to this archived message. This result should be reviewed alongside the original email and other evidence."),
         ("Recommended handling", "Do not open unexpected attachments or follow suspicious links. Verify requests through a separate trusted channel and preserve the original email if further investigation is required."),
@@ -617,14 +645,14 @@ if page == "Message Scanner":
                 st.warning("Please enter a message first.")
            else:
                 try:
-                    # Predict using the original trained model
-                    prediction = int(active_model.predict([message])[0])
+                    prediction, prediction_note = classify_message(active_model, message)
                     label = "spam" if prediction == 1 else "ham"
 
                     # Display the analysis result
                     st.session_state["scan_result"] = {
                         "message": message,
-                        "label": label
+                        "label": label,
+                        "note": prediction_note
                     }
 
                     # Save scan to Supabase history
@@ -659,323 +687,181 @@ if page == "Message Scanner":
             st.markdown("<div class='result-safe'><div class='eyebrow'>✓ MESSAGE CLEARED</div><div class='result-title' style='color:#38d9c4'>HAM / LEGITIMATE MESSAGE</div><div class='muted'>The original trained model classified this message as HAM.</div></div>", unsafe_allow_html=True)
         with st.expander("View analyzed message"):
             st.code(result["message"], language=None)
-        st.caption("The prediction follows predict_message.py. The current prediction script returns a class label only, so no confidence percentage is displayed.")
+        st.caption(result.get("note", "Classified by the selected trained model."))
+        st.caption("Automated screening can make mistakes. Review suspicious messages before taking action.")
 
 
 elif page == "Email Security":
 
-    from gmail_service import fetch_latest_emails, get_gmail_service, get_gmail_account_email
+    from gmail_service import (
+        fetch_latest_emails, get_gmail_authorization_url,
+        list_gmail_connections, disconnect_gmail_account,
+    )
 
     st.markdown("### 📧 Email Security")
-    st.caption("Scan your Gmail inbox, detect spam, and manage your secure email archive.")
+    st.caption("Connect multiple Gmail mailboxes, scan them independently, and keep a separate archive for each account.")
 
-    # Check Gmail connection
-    gmail_service = get_gmail_service()
+    current_user = get_current_user()
+    supabase = st.session_state.supabase_client
 
-    if gmail_service is None:
+    connected_accounts = list_gmail_connections(supabase, current_user.id)
+    if st.session_state.get("gmail_connected_notice"):
+        st.success(f"Connected successfully: {st.session_state.pop('gmail_connected_notice')}")
 
-        st.warning("Your Gmail account is not connected or the session has expired.")
+    with st.container(border=True):
+        st.markdown("#### Gmail Accounts")
+        if connected_accounts:
+            default_account = st.session_state.get("active_gmail_account")
+            if default_account not in connected_accounts:
+                default_account = connected_accounts[0]
+            selected_account = st.selectbox(
+                "Choose the mailbox to scan and view", connected_accounts,
+                index=connected_accounts.index(default_account), key="active_gmail_account_picker"
+            )
+            st.session_state["active_gmail_account"] = selected_account
+            col_add, col_disconnect = st.columns(2)
+            with col_add:
+                if st.button("＋ Add another Gmail", use_container_width=True):
+                    try:
+                        st.link_button("Continue with Google", get_gmail_authorization_url(), use_container_width=True)
+                    except Exception as exc:
+                        st.error(f"Could not start Gmail authorization: {exc}")
+            with col_disconnect:
+                if st.button("Disconnect selected Gmail", type="secondary", use_container_width=True):
+                    try:
+                        disconnect_gmail_account(supabase, current_user.id, selected_account)
+                        st.success(f"{selected_account} disconnected from this app.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Could not disconnect this account: {exc}")
+        else:
+            st.info("No Gmail accounts are connected yet.")
+            try:
+                st.link_button("🔗 Connect Gmail", get_gmail_authorization_url(), type="primary", use_container_width=True)
+            except Exception as exc:
+                st.error(f"Gmail connection setup error: {exc}")
+            selected_account = None
 
-        try:
-            from gmail_service import get_gmail_authorization_url
-
-            if st.button("🔗 Connect Gmail", type="primary"):
-                auth_url = get_gmail_authorization_url()
-                st.link_button("Authorize Gmail Account", auth_url)
-
-        except Exception as e:
-            st.error(f"Gmail connection error: {e}")
-
-    else:
-
-        st.success("🟢 Gmail account connected successfully!")
-        gmail_account_email = get_gmail_account_email(gmail_service)
-        st.caption(f"Connected Gmail: {gmail_account_email}")
-
-        # Select detection model
+    if selected_account:
+        st.success(f"Active mailbox: {selected_account}")
         email_model_options = ["Original Project Model"] + list(
             st.session_state.get("custom_trained_models", {}).keys()
         )
-
-        selected_email_model = st.selectbox(
-            "Detection Model",
-            email_model_options
-        )
-
+        selected_email_model = st.selectbox("Detection Model", email_model_options)
         active_email_model = model
-
         if selected_email_model != "Original Project Model":
-            active_email_model = st.session_state["custom_trained_models"][
-                selected_email_model
-            ]
+            active_email_model = st.session_state["custom_trained_models"][selected_email_model]
 
         st.markdown("---")
-
-        # Scan settings
         st.markdown("#### 🔍 Inbox Scanner")
-
-        max_emails = st.number_input(
-            "Number of latest emails to scan",
-            min_value=5,
-            max_value=100,
-            value=20,
-            step=5
-        )
-
-        if st.button(
-            "⚡ SCAN INBOX",
-            type="primary",
-            use_container_width=True
-        ):
-
+        max_emails = st.number_input("Number of latest emails to scan", min_value=5,
+                                     max_value=100, value=20, step=5)
+        if st.button("⚡ SCAN SELECTED INBOX", type="primary", use_container_width=True):
             try:
-                current_user = get_current_user()
-
-                if not current_user:
-                    st.error("Please log in again.")
-                    st.stop()
-
-                with st.spinner("Reading and analyzing your Gmail messages..."):
-
-                    # Keep each connected Gmail mailbox in its own archive.
-                    gmail_account_email = get_gmail_account_email(gmail_service)
+                with st.spinner(f"Scanning {selected_account}..."):
                     emails = fetch_latest_emails(
-                        max_results=int(max_emails)
+                        max_results=int(max_emails), account_email=selected_account,
+                        supabase=supabase, user_id=current_user.id
                     )
-
                     archive_records = []
-
                     for email in emails:
-
                         email_text = (
                             f"Subject: {email.get('subject', '')}\n"
                             f"From: {email.get('sender', '')}\n"
                             f"{email.get('body', '')}"
                         )
-
-                        if not any(str(email.get(key, "")).strip() for key in ("sender", "subject", "body")):
+                        if not any(str(email.get(k, "")).strip() for k in ("sender", "subject", "body")):
                             continue
-
-                        prediction = int(
-                            active_email_model.predict([email_text])[0]
-                        )
-
-                        classification = (
-                            "SPAM" if prediction == 1 else "HAM"
-                        )
-
+                        prediction, prediction_note = classify_message(active_email_model, email_text)
                         archive_records.append({
                             "user_id": current_user.id,
-                            "gmail_account_email": gmail_account_email,
+                            "gmail_account_email": selected_account,
                             "gmail_message_id": email["id"],
                             "sender": email.get("sender", ""),
                             "subject": email.get("subject", ""),
                             "email_body": email.get("body", ""),
                             "email_date": email.get("date", ""),
-                            "classification": classification
+                            "classification": "SPAM" if prediction == 1 else "HAM",
+                            "sha256": email.get("sha256", ""),
                         })
-
                     if archive_records:
-
-                        (
-                            st.session_state.supabase_client
-                            .table("email_scan_archive")
-                            .upsert(
-                                archive_records,
-                                on_conflict="user_id,gmail_account_email,gmail_message_id"
-                            )
-                            .execute()
-                        )
-
-                        st.success(
-                            f"Successfully scanned and archived "
-                            f"{len(archive_records)} emails."
-                        )
-
+                        supabase.table("email_scan_archive").upsert(
+                            archive_records,
+                            on_conflict="user_id,gmail_account_email,gmail_message_id"
+                        ).execute()
+                        st.success(f"Scanned and archived {len(archive_records)} messages from {selected_account}.")
                     else:
-                        st.info("No readable emails were found.")
-
-            except Exception as e:
-                st.error(f"Email scanning failed: {e}")
+                        st.info("No readable messages were found in this mailbox.")
+            except Exception as exc:
+                st.error(f"Email scanning failed: {exc}")
 
         st.markdown("---")
-
-        # Load user's private archive
-        st.markdown("### 📁 Email Archive")
-
+        st.markdown(f"### 📁 Email Archive — {selected_account}")
         try:
-            current_user = get_current_user()
-
             archive_response = (
-                st.session_state.supabase_client
-                .table("email_scan_archive")
-                .select(
-                    "id, gmail_account_email, gmail_message_id, sender, subject, "
-                    "email_body, email_date, classification, scanned_at"
-                )
+                supabase.table("email_scan_archive")
+                .select("id, gmail_message_id, gmail_account_email, sender, subject, email_body, email_date, classification, scanned_at, sha256")
                 .eq("user_id", current_user.id)
-                .eq("gmail_account_email", gmail_account_email)
-                .order("scanned_at", desc=True)
-                .limit(500)
-                .execute()
+                .eq("gmail_account_email", selected_account)
+                .order("scanned_at", desc=True).limit(500).execute()
             )
-
             archive_data = archive_response.data or []
-
             if archive_data:
-
                 archive_df = pd.DataFrame(archive_data)
-
                 total_emails = len(archive_df)
-
-                spam_count = int(
-                    (archive_df["classification"] == "SPAM").sum()
-                )
-
-                ham_count = int(
-                    (archive_df["classification"] == "HAM").sum()
-                )
-
+                spam_count = int((archive_df["classification"] == "SPAM").sum())
+                ham_count = int((archive_df["classification"] == "HAM").sum())
                 metric1, metric2, metric3 = st.columns(3)
-
                 metric1.metric("Archived Emails", total_emails)
                 metric2.metric("HAM Emails", ham_count)
                 metric3.metric("SPAM Emails", spam_count)
-
-                st.download_button(
-                    "📄 Download PDF Archive Report",
+                st.download_button("📄 Download PDF Archive Report",
                     data=build_archive_pdf(archive_df),
-                    file_name="email_security_archive_report.pdf",
-                    mime="application/pdf",
-                    use_container_width=True
-                )
-
+                    file_name=f"{selected_account.replace('@','_at_')}_archive_report.pdf",
+                    mime="application/pdf", use_container_width=True)
                 st.markdown("#### Filter Archive")
-
-                selected_filter = st.selectbox(
-                    "Classification",
-                    ["ALL", "HAM", "SPAM"]
-                )
-
+                selected_filter = st.selectbox("Classification", ["ALL", "HAM", "SPAM"], key="mail_archive_filter")
                 filtered_df = archive_df.copy()
-
                 if selected_filter != "ALL":
-                    filtered_df = filtered_df[
-                        filtered_df["classification"] == selected_filter
-                    ]
-
-                st.dataframe(
-                    filtered_df[
-                        [
-                            "sender",
-                            "subject",
-                            "classification",
-                            "email_date",
-                            "scanned_at"
-                        ]
-                    ],
-                    use_container_width=True,
-                    hide_index=True
-                )
-
-                # View individual email details
+                    filtered_df = filtered_df[filtered_df["classification"] == selected_filter]
+                st.dataframe(filtered_df[["sender", "subject", "classification", "email_date", "scanned_at"]],
+                             use_container_width=True, hide_index=True)
                 st.markdown("#### Email Details")
-
                 for _, email_row in filtered_df.iterrows():
-
                     label = email_row["classification"]
-
                     icon = "⚠️" if label == "SPAM" else "✅"
-
-                    with st.expander(
-                        f"{icon} {label} — {email_row['subject'] or 'No Subject'}"
-                    ):
-
+                    with st.expander(f"{icon} {label} — {email_row['subject'] or 'No Subject'}"):
                         st.write("**Sender:**", email_row["sender"])
                         st.write("**Email Date:**", email_row["email_date"])
                         st.write("**Classification:**", label)
-
+                        if email_row.get("sha256"):
+                            st.code(str(email_row["sha256"]), language=None)
+                            st.caption("SHA-256 of the original Gmail message bytes")
                         if label == "SPAM":
-                            report_row = email_row.to_dict()
-                            st.download_button(
-                                "📄 Download SPAM Analysis PDF",
-                                data=build_spam_message_pdf(report_row),
-                                file_name=f"spam_analysis_{str(email_row.get('gmail_message_id', 'message'))[:24]}.pdf",
-                                mime="application/pdf",
-                                key=f"spam_pdf_{email_row['id']}",
-                                use_container_width=True
-                            )
-
+                            st.download_button("📄 Download SPAM Analysis PDF",
+                                data=build_spam_message_pdf(email_row.to_dict()),
+                                file_name=f"spam_analysis_{str(email_row.get('gmail_message_id','message'))[:24]}.pdf",
+                                mime="application/pdf", key=f"spam_pdf_{email_row['id']}",
+                                use_container_width=True)
                         st.markdown("**Message Content:**")
-
-                        st.text(
-                            email_row["email_body"] or "No readable text content."
-                        )
-
-                # Export filtered archive
+                        st.text(email_row["email_body"] or "No readable text content.")
                 st.markdown("---")
                 st.markdown("#### 📥 Export Archive")
-
-                export_df = filtered_df[
-                    [
-                        "sender",
-                        "subject",
-                        "email_body",
-                        "email_date",
-                        "classification",
-                        "scanned_at"
-                    ]
-                ]
-
-                csv_data = export_df.to_csv(
-                    index=False,
-                    encoding="utf-8-sig"
-                )
-
-                st.download_button(
-                    "⬇ Download CSV",
-                    data=csv_data,
-                    file_name="gmail_security_archive.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
-
-                try:
-                    excel_buffer = io.BytesIO()
-
-                    with pd.ExcelWriter(
-                        excel_buffer,
-                        engine="openpyxl"
-                    ) as writer:
-
-                        export_df.to_excel(
-                            writer,
-                            index=False,
-                            sheet_name="Email Archive"
-                        )
-
-                    st.download_button(
-                        "⬇ Download Excel",
-                        data=excel_buffer.getvalue(),
-                        file_name="gmail_security_archive.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True
-                    )
-
-                except Exception as excel_error:
-                    st.warning(
-                        "Excel export is unavailable. CSV export is ready."
-                    )
-
+                export_cols = [c for c in ["sender", "subject", "email_body", "email_date", "classification", "sha256", "scanned_at"] if c in filtered_df.columns]
+                export_df = filtered_df[export_cols]
+                st.download_button("⬇ Download CSV", data=export_df.to_csv(index=False, encoding="utf-8-sig"),
+                    file_name="gmail_security_archive.csv", mime="text/csv", use_container_width=True)
+                excel_buffer = io.BytesIO()
+                with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+                    export_df.to_excel(writer, index=False, sheet_name="Email Archive")
+                st.download_button("⬇ Download Excel", data=excel_buffer.getvalue(),
+                    file_name="gmail_security_archive.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True)
             else:
-                st.info(
-                    "Your email archive is empty. "
-                    "Click SCAN INBOX to analyze your Gmail messages."
-                )
-
-        except Exception as e:
-            st.error(f"Could not load email archive: {e}")
-
+                st.info("This mailbox has no archived messages yet. Click SCAN SELECTED INBOX to begin.")
+        except Exception as exc:
+            st.error(f"Could not load this mailbox archive: {exc}")
 
 elif page == "Scan History":
     st.markdown("### 🕘 Scan History")
