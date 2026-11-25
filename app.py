@@ -664,7 +664,7 @@ if page == "Message Scanner":
 
 elif page == "Email Security":
 
-    from gmail_service import fetch_latest_emails, get_gmail_service
+    from gmail_service import fetch_latest_emails, get_gmail_service, get_gmail_account_email
 
     st.markdown("### 📧 Email Security")
     st.caption("Scan your Gmail inbox, detect spam, and manage your secure email archive.")
@@ -689,6 +689,8 @@ elif page == "Email Security":
     else:
 
         st.success("🟢 Gmail account connected successfully!")
+        gmail_account_email = get_gmail_account_email(gmail_service)
+        st.caption(f"Connected Gmail: {gmail_account_email}")
 
         # Select detection model
         email_model_options = ["Original Project Model"] + list(
@@ -735,6 +737,8 @@ elif page == "Email Security":
 
                 with st.spinner("Reading and analyzing your Gmail messages..."):
 
+                    # Keep each connected Gmail mailbox in its own archive.
+                    gmail_account_email = get_gmail_account_email(gmail_service)
                     emails = fetch_latest_emails(
                         max_results=int(max_emails)
                     )
@@ -762,6 +766,7 @@ elif page == "Email Security":
 
                         archive_records.append({
                             "user_id": current_user.id,
+                            "gmail_account_email": gmail_account_email,
                             "gmail_message_id": email["id"],
                             "sender": email.get("sender", ""),
                             "subject": email.get("subject", ""),
@@ -777,7 +782,7 @@ elif page == "Email Security":
                             .table("email_scan_archive")
                             .upsert(
                                 archive_records,
-                                on_conflict="user_id,gmail_message_id"
+                                on_conflict="user_id,gmail_account_email,gmail_message_id"
                             )
                             .execute()
                         )
@@ -805,10 +810,11 @@ elif page == "Email Security":
                 st.session_state.supabase_client
                 .table("email_scan_archive")
                 .select(
-                    "id, gmail_message_id, sender, subject, "
+                    "id, gmail_account_email, gmail_message_id, sender, subject, "
                     "email_body, email_date, classification, scanned_at"
                 )
                 .eq("user_id", current_user.id)
+                .eq("gmail_account_email", gmail_account_email)
                 .order("scanned_at", desc=True)
                 .limit(500)
                 .execute()
