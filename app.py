@@ -114,7 +114,7 @@ if not st.session_state.authenticated:
             key="login_password"
         )
 
-        if st.button("Login", use_container_width=True):
+        if st.button("Login", width="stretch"):
 
             try:
                 response = st.session_state.supabase_client.auth.sign_in_with_password({
@@ -150,7 +150,7 @@ if not st.session_state.authenticated:
             type="password"
         )
 
-        if st.button("Create Account", use_container_width=True):
+        if st.button("Create Account", width="stretch"):
 
             if not new_email or not new_password:
                 st.warning("Please fill in all fields.")
@@ -475,13 +475,13 @@ def build_spam_message_pdf(email_row):
 with st.sidebar:
     st.markdown("### 👤 Account")
 
-    if st.button("Logout", use_container_width=True):
+    if st.button("Logout", width="stretch"):
         st.session_state.supabase_client.auth.sign_out()
         st.session_state.authenticated = False
         st.rerun()
 
     st.markdown("---")
-    st.image(str(ROOT / "project_logo.png"), use_container_width=True)
+    st.image(str(ROOT / "project_logo.png"), width="stretch")
     st.markdown("<div class='sidebar-brand'>INTELLIGENT SECURITY CONSOLE</div>", unsafe_allow_html=True)
     st.caption("SPAM & THREAT ANALYSIS")
     st.markdown("---")
@@ -513,7 +513,7 @@ if not DATA_PATH.exists():
 
 if not model_ready():
     st.warning("The original model has not been trained yet. Train all four classifiers to create best_model.joblib and metrics.csv.")
-    if st.button("🚀 TRAIN PROJECT MODELS", type="primary", use_container_width=True):
+    if st.button("🚀 TRAIN PROJECT MODELS", type="primary", width="stretch"):
         with st.spinner("Training Naive Bayes, Logistic Regression, Linear SVM and Random Forest..."):
             result = run_training()
         if result.returncode == 0:
@@ -595,7 +595,7 @@ if page == "Message Scanner":
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            if st.button("⚠️ Generate SPAM", use_container_width=True):
+            if st.button("⚠️ Generate SPAM", width="stretch"):
                 examples = dataset[
                     dataset["label"].astype(str).str.lower() == "spam"
                 ]["text"]
@@ -605,7 +605,7 @@ if page == "Message Scanner":
                     st.rerun()
 
         with col2:
-            if st.button("✅ Generate HAM", use_container_width=True):
+            if st.button("✅ Generate HAM", width="stretch"):
                 examples = dataset[
                     dataset["label"].astype(str).str.lower() == "ham"
                 ]["text"]
@@ -615,7 +615,7 @@ if page == "Message Scanner":
                     st.rerun()
 
         with col3:
-            if st.button("✍️ Write My Own", use_container_width=True):
+            if st.button("✍️ Write My Own", width="stretch"):
                 st.session_state["message_input"] = ""
                 st.rerun()
 
@@ -640,7 +640,7 @@ if page == "Message Scanner":
         if selected_model != "Original Project Model":
             active_model = st.session_state["custom_trained_models"][selected_model]
 
-        if st.button("⚡ ANALYZE MESSAGE", type="primary", use_container_width=True):
+        if st.button("⚡ ANALYZE MESSAGE", type="primary", width="stretch"):
            if not message.strip():
                 st.warning("Please enter a message first.")
            else:
@@ -721,13 +721,13 @@ elif page == "Email Security":
             st.session_state["active_gmail_account"] = selected_account
             col_add, col_disconnect = st.columns(2)
             with col_add:
-                if st.button("＋ Add another Gmail", use_container_width=True):
+                if st.button("＋ Add another Gmail", width="stretch"):
                     try:
-                        st.link_button("Continue with Google", get_gmail_authorization_url(), use_container_width=True)
+                        st.link_button("Continue with Google", get_gmail_authorization_url(), width="stretch")
                     except Exception as exc:
                         st.error(f"Could not start Gmail authorization: {exc}")
             with col_disconnect:
-                if st.button("Disconnect selected Gmail", type="secondary", use_container_width=True):
+                if st.button("Disconnect selected Gmail", type="secondary", width="stretch"):
                     try:
                         disconnect_gmail_account(supabase, current_user.id, selected_account)
                         st.success(f"{selected_account} disconnected from this app.")
@@ -737,7 +737,7 @@ elif page == "Email Security":
         else:
             st.info("No Gmail accounts are connected yet.")
             try:
-                st.link_button("🔗 Connect Gmail", get_gmail_authorization_url(), type="primary", use_container_width=True)
+                st.link_button("🔗 Connect Gmail", get_gmail_authorization_url(), type="primary", width="stretch")
             except Exception as exc:
                 st.error(f"Gmail connection setup error: {exc}")
             selected_account = None
@@ -756,7 +756,7 @@ elif page == "Email Security":
         st.markdown("#### 🔍 Inbox Scanner")
         max_emails = st.number_input("Number of latest emails to scan", min_value=5,
                                      max_value=100, value=20, step=5)
-        if st.button("⚡ SCAN SELECTED INBOX", type="primary", use_container_width=True):
+        if st.button("⚡ SCAN SELECTED INBOX", type="primary", width="stretch"):
             try:
                 with st.spinner(f"Scanning {selected_account}..."):
                     emails = fetch_latest_emails(
@@ -818,14 +818,14 @@ elif page == "Email Security":
                 st.download_button("📄 Download PDF Archive Report",
                     data=build_archive_pdf(archive_df),
                     file_name=f"{selected_account.replace('@','_at_')}_archive_report.pdf",
-                    mime="application/pdf", use_container_width=True)
+                    mime="application/pdf", width="stretch")
                 st.markdown("#### Filter Archive")
                 selected_filter = st.selectbox("Classification", ["ALL", "HAM", "SPAM"], key="mail_archive_filter")
                 filtered_df = archive_df.copy()
                 if selected_filter != "ALL":
                     filtered_df = filtered_df[filtered_df["classification"] == selected_filter]
                 st.dataframe(filtered_df[["sender", "subject", "classification", "email_date", "scanned_at"]],
-                             use_container_width=True, hide_index=True)
+                             width="stretch", hide_index=True)
                 st.markdown("#### Email Details")
                 for _, email_row in filtered_df.iterrows():
                     label = email_row["classification"]
@@ -842,7 +842,7 @@ elif page == "Email Security":
                                 data=build_spam_message_pdf(email_row.to_dict()),
                                 file_name=f"spam_analysis_{str(email_row.get('gmail_message_id','message'))[:24]}.pdf",
                                 mime="application/pdf", key=f"spam_pdf_{email_row['id']}",
-                                use_container_width=True)
+                                width="stretch")
                         st.markdown("**Message Content:**")
                         st.text(email_row["email_body"] or "No readable text content.")
                 st.markdown("---")
@@ -850,14 +850,14 @@ elif page == "Email Security":
                 export_cols = [c for c in ["sender", "subject", "email_body", "email_date", "classification", "sha256", "scanned_at"] if c in filtered_df.columns]
                 export_df = filtered_df[export_cols]
                 st.download_button("⬇ Download CSV", data=export_df.to_csv(index=False, encoding="utf-8-sig"),
-                    file_name="gmail_security_archive.csv", mime="text/csv", use_container_width=True)
+                    file_name="gmail_security_archive.csv", mime="text/csv", width="stretch")
                 excel_buffer = io.BytesIO()
                 with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
                     export_df.to_excel(writer, index=False, sheet_name="Email Archive")
                 st.download_button("⬇ Download Excel", data=excel_buffer.getvalue(),
                     file_name="gmail_security_archive.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True)
+                    width="stretch")
             else:
                 st.info("This mailbox has no archived messages yet. Click SCAN SELECTED INBOX to begin.")
         except Exception as exc:
@@ -935,16 +935,16 @@ elif page == "Model Dashboard":
     fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                       legend_title="", xaxis_title="", yaxis_title="Score",
                       margin=dict(l=10,r=10,t=25,b=10))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     st.markdown("#### Full evaluation metrics")
     st.dataframe(metrics_df.style.format({c:"{:.4f}" for c in metrics_df.columns if c != "model"}),
-                 use_container_width=True, hide_index=True)
+                 width="stretch", hide_index=True)
     st.info(f"Best model selected by spam F1-score in your training script: {best_name}.")
     for image_name, caption in [("model_comparison.png","Model comparison chart"),("confusion_matrices.png","Confusion matrices")]:
         image_path = OUTPUT_DIR / image_name
         if image_path.exists():
             st.markdown(f"#### {caption}")
-            st.image(str(image_path), use_container_width=True)
+            st.image(str(image_path), width="stretch")
 
 elif page == "Dataset Explorer":
     st.markdown("### 🗂️ Dataset Explorer")
@@ -960,7 +960,7 @@ elif page == "Dataset Explorer":
     view = dataset[dataset["label"].isin(labels)].copy()
     if query.strip():
         view = view[view["text"].str.contains(query, case=False, na=False)]
-    st.dataframe(view[["label","label_num","text"]], use_container_width=True, height=430)
+    st.dataframe(view[["label","label_num","text"]], width="stretch", height=430)
     st.download_button("⬇ Download filtered CSV", view.to_csv(index=False).encode("utf-8"),
                        file_name="filtered_spam_ham_dataset.csv", mime="text/csv")
 
@@ -988,7 +988,7 @@ elif page == "Custom Dataset Training":
                 st.success("Dataset uploaded successfully!")
 
                 st.markdown("#### Dataset Preview")
-                st.dataframe(custom_data.head(10), use_container_width=True)
+                st.dataframe(custom_data.head(10), width="stretch")
 
                 st.markdown("#### Dataset Information")
                 st.write(f"Rows: {custom_data.shape[0]}")
@@ -1165,7 +1165,7 @@ elif page == "Custom Dataset Training":
 
                         st.dataframe(
                             prepared_data.head(10),
-                            use_container_width=True
+                            width="stretch"
                         )
 
                         if prepared_data["label"].nunique() == 2:
@@ -1189,7 +1189,7 @@ elif page == "Custom Dataset Training":
                             if st.button(
                                 "START MODEL TRAINING",
                                 type="primary",
-                                use_container_width=True
+                                width="stretch"
                             ):
                                 X = prepared_data["text"]
                                 y = prepared_data["label"].map({
@@ -1353,7 +1353,7 @@ elif page == "Custom Dataset Training":
                                     "Recall": "{:.2%}",
                                     "F1-score": "{:.2%}"
                                 }),
-                                use_container_width=True,
+                                width="stretch",
                                 hide_index=True
                             )
 
@@ -1381,7 +1381,7 @@ elif page == "Custom Dataset Training":
                                 data=model_buffer.getvalue(),
                                 file_name="custom_spam_model.joblib",
                                 mime="application/octet-stream",
-                                use_container_width=True
+                                width="stretch"
                             )
 
         except Exception as e:
