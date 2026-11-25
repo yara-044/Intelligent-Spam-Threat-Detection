@@ -103,28 +103,43 @@ def get_current_user():
 # Gmail OAuth Callback
 if "code" in st.query_params:
     try:
-        from gmail_service import complete_gmail_authorization
+        from gmail_service import (
+            complete_gmail_authorization,
+            get_gmail_oauth_user_id,
+        )
 
         code = st.query_params.get("code")
         returned_state = st.query_params.get("state")
-        auth_user = get_current_user()
-        if auth_user is None:
-            st.session_state.authenticated = False
+        state_user_id = get_gmail_oauth_user_id(returned_state)
+
+        # Streamlit session_state may be recreated while the browser is at Google.
+        # The signed, short-lived state identifies the app user for this callback.
+        service_role_key = st.secrets.get("SUPABASE_SERVICE_ROLE_KEY")
+        if not service_role_key:
             raise ValueError(
-                "Your app login session expired before Google returned. "
-                "Please sign in again, then connect Gmail once more."
+                "Missing SUPABASE_SERVICE_ROLE_KEY in Streamlit Secrets. "
+                "Add the Supabase service_role key privately, then retry Gmail connection."
             )
-        mailbox = complete_gmail_authorization(
-            code, returned_state, st.session_state.supabase_client, auth_user.id
+
+        admin_supabase = create_client(
+            st.secrets["SUPABASE_URL"],
+            str(service_role_key),
         )
+        mailbox = complete_gmail_authorization(
+            code, returned_state, admin_supabase, state_user_id
+        )
+
         st.query_params.clear()
         st.session_state["gmail_connected_notice"] = mailbox
+        st.session_state["gmail_callback_message"] = (
+            f"{mailbox} was connected successfully. Please sign in again "
+            "to continue using your saved Gmail connection."
+        )
+        st.session_state["authenticated"] = False
 
     except Exception as e:
         st.query_params.clear()
         st.error(f"Gmail authorization failed: {e}")
-
-
 
 
 # --------------------------- Authentication State ---------------------------
@@ -136,6 +151,9 @@ if "authenticated" not in st.session_state:
 # --------------------------- Login and Signup ---------------------------
 
 if not st.session_state.authenticated:
+
+    if st.session_state.get("gmail_callback_message"):
+        st.info(st.session_state.pop("gmail_callback_message"))
 
     st.title("🛡️ Intelligent Spam Detector")
     st.subheader("Welcome")
@@ -763,7 +781,7 @@ elif page == "Email Security":
             with col_add:
                 if st.button("＋ Add another Gmail", use_container_width=True):
                     try:
-                        st.link_button("Continue with Google", get_gmail_authorization_url(), use_container_width=True)
+                        st.link_button("Continue with Google", get_gmail_authorization_url(current_user.id), use_container_width=True)
                     except Exception as exc:
                         st.error(f"Could not start Gmail authorization: {exc}")
             with col_disconnect:
@@ -777,7 +795,7 @@ elif page == "Email Security":
         else:
             st.info("No Gmail accounts are connected yet.")
             try:
-                st.link_button("🔗 Connect Gmail", get_gmail_authorization_url(), type="primary", use_container_width=True)
+                st.link_button("🔗 Connect Gmail", get_gmail_authorization_url(current_user.id), type="primary", use_container_width=True)
             except Exception as exc:
                 st.error(f"Gmail connection setup error: {exc}")
             selected_account = None

@@ -53,34 +53,68 @@ def _oauth_secret() -> str:
     return str(value)
 
 
-def get_gmail_authorization_url() -> str:
-    secret = _oauth_secret()
-    nonce = secrets.token_urlsafe(32)
-    signature = hmac.new(secret.encode(), nonce.encode(), hashlib.sha256).hexdigest()
-    state = f"{nonce}.{signature}"
-    verifier = hmac.new(secret.encode(), f"pkce:{nonce}".encode(), hashlib.sha256).hexdigest()
-    st.session_state["gmail_pending_state"] = state
-    flow = create_gmail_flow(state=state, code_verifier=verifier)
-    url, _ = flow.authorization_url(access_type="offline", include_granted_scopes="true",
-                                    prompt="select_account consent", login_hint=None)
+def _encode_oauth_state(user_id: str) -> str:
+    """Create a signed, short-lived OAuth state bound to the app user."""
+    if not user_id:
+        raise ValueError("Please sign in before connecting Gmail.")
+    payload = {
+        "uid": str(user_id),
+        "nonce": secrets.token_urlsafe(32),
+        "iat": __import__("time").time(),
+    }
+    raw = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    encoded = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+    signature = hmac.new(_oauth_secret().encode(), encoded.encode(), hashlib.sha256).hexdigest()
+    return f"{encoded}.{signature}"
+
+
+def _decode_oauth_state(returned_state: str) -> dict:
+    """Verify OAuth state without relying on Streamlit session_state surviving redirects."""
+    if not returned_state or "." not in returned_state:
+        raise ValueError("Google authorization response is missing its security state.")
+    encoded, received_signature = returned_state.rsplit(".", 1)
+    expected_signature = hmac.new(
+        _oauth_secret().encode(), encoded.encode(), hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(received_signature, expected_signature):
+        raise ValueError("Google authorization state is invalid. Please connect Gmail again.")
+    try:
+        raw = base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4))
+        payload = json.loads(raw.decode("utf-8"))
+        issued_at = float(payload["iat"])
+        user_id = str(payload["uid"]).strip()
+        age = __import__("time").time() - issued_at
+    except Exception as exc:
+        raise ValueError("Google authorization state is malformed. Please connect Gmail again.") from exc
+    if not user_id or age < -60 or age > 600:
+        raise ValueError("Google authorization request expired. Please connect Gmail again.")
+    return payload
+
+
+def get_gmail_oauth_user_id(returned_state: str) -> str:
+    """Return the app user id embedded in a valid signed OAuth state."""
+    return str(_decode_oauth_state(returned_state)["uid"])
+
+
+def get_gmail_authorization_url(user_id: str) -> str:
+    state = _encode_oauth_state(user_id)
+    flow = create_gmail_flow(state=state)
+    url, _ = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="select_account consent",
+    )
     return url
 
 
 def _credentials_from_code(code: str, returned_state: str):
-    if not code or not returned_state or "." not in returned_state:
+    if not code:
         raise ValueError("Google authorization response is incomplete.")
-    pending = st.session_state.get("gmail_pending_state")
-    if not pending or not hmac.compare_digest(str(pending), str(returned_state)):
-        raise ValueError("Invalid or expired OAuth state. Please connect again.")
-    nonce, received = returned_state.rsplit(".", 1)
-    expected = hmac.new(_oauth_secret().encode(), nonce.encode(), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(received, expected):
-        raise ValueError("OAuth state signature verification failed.")
-    verifier = hmac.new(_oauth_secret().encode(), f"pkce:{nonce}".encode(), hashlib.sha256).hexdigest()
-    flow = create_gmail_flow(state=returned_state, code_verifier=verifier)
+    _decode_oauth_state(returned_state)
+    flow = create_gmail_flow(state=returned_state)
     flow.fetch_token(code=code)
-    st.session_state.pop("gmail_pending_state", None)
     return flow.credentials
+
 
 
 def _build_service(credentials):
@@ -100,7 +134,11 @@ def _mailbox_email(credentials) -> str:
     return email
 
 
-def complete_gmail_authorization(code: str, returned_state: str, supabase, user_id: str) -> str:
+def complete_gmail_authorization(code: str, returned_state: str, supabase, user_id: str | None = None) -> str:
+    state_user_id = get_gmail_oauth_user_id(returned_state)
+    if user_id is not None and str(user_id) != state_user_id:
+        raise ValueError("The Google authorization request belongs to a different app account.")
+    user_id = state_user_id
     credentials = _credentials_from_code(code, returned_state)
     mailbox = _mailbox_email(credentials)
     encrypted = _fernet().encrypt(credentials.to_json().encode("utf-8")).decode("ascii")
