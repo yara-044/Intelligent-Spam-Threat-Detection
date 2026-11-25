@@ -40,8 +40,13 @@ def create_gmail_flow(state: str | None = None, code_verifier: str | None = None
         "token_uri": "https://oauth2.googleapis.com/token",
         "redirect_uris": [cfg["redirect_uri"]],
     }}
-    flow = Flow.from_client_config(client_config, scopes=GMAIL_SCOPES,
-                                   state=state, code_verifier=code_verifier)
+    flow = Flow.from_client_config(
+        client_config,
+        scopes=GMAIL_SCOPES,
+        state=state,
+        code_verifier=code_verifier,
+        autogenerate_code_verifier=False,
+    )
     flow.redirect_uri = cfg["redirect_uri"]
     return flow
 
@@ -129,7 +134,13 @@ def _credentials_from_code(code: str, returned_state: str):
         state=returned_state,
         code_verifier=state_payload["code_verifier"],
     )
-    flow.fetch_token(code=code)
+    # Pass the verifier explicitly to the token exchange as well as the
+    # OAuth2Session constructor. This ensures requests-oauthlib includes it
+    # in the authorization-code token request.
+    flow.fetch_token(
+        code=code,
+        code_verifier=state_payload["code_verifier"],
+    )
     return flow.credentials
 
 
