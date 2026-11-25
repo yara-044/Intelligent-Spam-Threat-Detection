@@ -53,14 +53,18 @@ def _oauth_secret() -> str:
     return str(value)
 
 
-def _encode_oauth_state(user_id: str) -> str:
-    """Create a signed, short-lived OAuth state bound to the app user."""
+def _encode_oauth_state(user_id: str, code_verifier: str) -> str:
+    """Create signed state and securely carry the PKCE verifier across the redirect."""
     if not user_id:
         raise ValueError("Please sign in before connecting Gmail.")
+    if not code_verifier:
+        raise ValueError("Could not create the Gmail security verifier. Please try again.")
+    encrypted_verifier = _fernet().encrypt(code_verifier.encode("utf-8")).decode("ascii")
     payload = {
         "uid": str(user_id),
         "nonce": secrets.token_urlsafe(32),
         "iat": __import__("time").time(),
+        "pkce": encrypted_verifier,
     }
     raw = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
     encoded = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
@@ -88,6 +92,15 @@ def _decode_oauth_state(returned_state: str) -> dict:
         raise ValueError("Google authorization state is malformed. Please connect Gmail again.") from exc
     if not user_id or age < -60 or age > 600:
         raise ValueError("Google authorization request expired. Please connect Gmail again.")
+    encrypted_verifier = payload.get("pkce")
+    if not encrypted_verifier:
+        raise ValueError("The Gmail security verifier is missing. Please connect Gmail again.")
+    try:
+        payload["code_verifier"] = _fernet().decrypt(
+            encrypted_verifier.encode("ascii")
+        ).decode("utf-8")
+    except Exception as exc:
+        raise ValueError("The Gmail security verifier could not be restored. Please reconnect Gmail.") from exc
     return payload
 
 
@@ -97,8 +110,9 @@ def get_gmail_oauth_user_id(returned_state: str) -> str:
 
 
 def get_gmail_authorization_url(user_id: str) -> str:
-    state = _encode_oauth_state(user_id)
-    flow = create_gmail_flow(state=state)
+    code_verifier = secrets.token_urlsafe(64)
+    state = _encode_oauth_state(user_id, code_verifier)
+    flow = create_gmail_flow(state=state, code_verifier=code_verifier)
     url, _ = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
@@ -110,8 +124,11 @@ def get_gmail_authorization_url(user_id: str) -> str:
 def _credentials_from_code(code: str, returned_state: str):
     if not code:
         raise ValueError("Google authorization response is incomplete.")
-    _decode_oauth_state(returned_state)
-    flow = create_gmail_flow(state=returned_state)
+    state_payload = _decode_oauth_state(returned_state)
+    flow = create_gmail_flow(
+        state=returned_state,
+        code_verifier=state_payload["code_verifier"],
+    )
     flow.fetch_token(code=code)
     return flow.credentials
 
